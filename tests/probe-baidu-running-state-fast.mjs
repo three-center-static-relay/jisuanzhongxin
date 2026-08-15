@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+// trigger fast probe 2026-08-15T21:02+08:00
 const URL="https://compute-worker.a15280020511.workers.dev/__acceptance/baidu-existing-v100-20260815d";
 const r=await fetch(URL,{headers:{accept:"application/json"}});
 const text=await r.text();let b={};try{b=text?JSON.parse(text):{}}catch{b={raw:text.slice(0,500)}}
