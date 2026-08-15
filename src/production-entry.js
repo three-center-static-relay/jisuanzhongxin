@@ -3,7 +3,7 @@ import {maybeHandleBaiduCircleCI} from "./baidu-circleci-router.js";
 import {maybeHandleModels} from "./model-router.js";
 import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {medicalImagingMeta} from "./medical-imaging-toolkit.js";
-import {modalHealth,modalMeta} from "./modal.js";
+import {modalCpuSelftest,modalHealth,modalMeta} from "./modal.js";
 export {CenterGate};
 
 async function normalizeMedicalImagingRequest(req){
@@ -23,6 +23,12 @@ export default {
     if(req.method==="GET"&&u.pathname==="/v1/toolkits/medical-imaging/meta")return Response.json({ok:true,...medicalImagingMeta(),request_profile:"medical-imaging",gpu_optional:true},{headers:{"cache-control":"no-store"}});
     if(req.method==="GET"&&u.pathname==="/v1/providers/modal/meta")return Response.json({ok:true,...modalMeta(),secret_echo:false},{headers:{"cache-control":"no-store"}});
     if(req.method==="GET"&&u.pathname==="/v1/providers/modal/health"){const p=await modalHealth(env);return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}})}
+    if(req.method==="POST"&&u.pathname==="/v1/providers/modal/selftest/cpu"){
+      let body={};try{body=await req.json()}catch{}
+      const n=body?.n===undefined?10000:Number(body.n);
+      const p=await modalCpuSelftest(env,n);
+      return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}});
+    }
     req=await normalizeMedicalImagingRequest(req);
     const benchmarkHandled=await maybeHandleBenchmarks(req);
     if(benchmarkHandled)return benchmarkHandled;
