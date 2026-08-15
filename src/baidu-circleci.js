@@ -5,7 +5,7 @@ const str=(v)=>String(v||"").trim();
 const bool=(v)=>String(v||"").toLowerCase()==="true";
 
 export function baiduCircleCIMeta(env={}){
-  const configured=Boolean(str(env.CIRCLECI_API_TOKEN)&&str(env.CIRCLECI_PROJECT_SLUG)&&str(env.CIRCLECI_PIPELINE_DEFINITION_ID)&&str(env.BAIDU_BRIDGE_SHARED_SECRET));
+  const configured=Boolean(str(env.CIRCLECI_API_TOKEN)&&str(env.CIRCLECI_PROJECT_SLUG)&&str(env.CIRCLECI_PIPELINE_DEFINITION_ID));
   const e2eVerified=bool(env.BAIDU_CIRCLECI_E2E_VERIFIED);
   return {
     provider:"circleci",
@@ -22,30 +22,34 @@ export function baiduCircleCIMeta(env={}){
     baidu_gpus:1,
     arbitrary_code:false,
     arbitrary_shell:false,
-    input_transport:"authenticated-task-manifest-pull",
+    input_transport:"ephemeral-ticket-task-manifest-pull",
+    static_shared_secret_required:false,
+    ephemeral_ticket:true,
     max_task_seconds:900,
     secret_echo:false
   };
 }
 
 function requireConfig(env){
-  const token=str(env.CIRCLECI_API_TOKEN),project=str(env.CIRCLECI_PROJECT_SLUG),definition=str(env.CIRCLECI_PIPELINE_DEFINITION_ID),secret=str(env.BAIDU_BRIDGE_SHARED_SECRET);
-  if(!token||!project||!definition||!secret)throw Object.assign(new Error("BAIDU_CIRCLECI_BRIDGE_NOT_CONFIGURED"),{status:503});
+  const token=str(env.CIRCLECI_API_TOKEN),project=str(env.CIRCLECI_PROJECT_SLUG),definition=str(env.CIRCLECI_PIPELINE_DEFINITION_ID);
+  if(!token||!project||!definition)throw Object.assign(new Error("BAIDU_CIRCLECI_BRIDGE_NOT_CONFIGURED"),{status:503});
   return {token,project,definition,branch:str(env.CIRCLECI_CONFIG_BRANCH)||"main"};
 }
 
-export async function triggerBaiduBridge(env,{op,task_id,baidu_job_id=""}){
+export async function triggerBaiduBridge(env,{op,task_id,baidu_job_id="",bridge_ticket}){
   const cfg=requireConfig(env),operation=str(op).toUpperCase();
   if(!ALLOWED_OPS.has(operation))throw Object.assign(new Error("BAIDU_BRIDGE_OPERATION_DENIED"),{status:400});
   const id=str(task_id);
   if(!/^[A-Za-z0-9._:-]{1,96}$/.test(id))throw Object.assign(new Error("BAIDU_BRIDGE_TASK_ID_INVALID"),{status:400});
   const job=str(baidu_job_id);
   if(job&&!/^[A-Za-z0-9._:-]{1,128}$/.test(job))throw Object.assign(new Error("BAIDU_BRIDGE_JOB_ID_INVALID"),{status:400});
+  const ticket=str(bridge_ticket);
+  if(!/^[A-Za-z0-9_-]{32,128}$/.test(ticket))throw Object.assign(new Error("BAIDU_BRIDGE_TICKET_INVALID"),{status:500});
   const body={
     definition_id:cfg.definition,
     config:{branch:cfg.branch},
     checkout:{branch:cfg.branch},
-    parameters:{bridge_dispatch:true,bridge_op:operation,task_id:id,baidu_job_id:job}
+    parameters:{bridge_dispatch:true,bridge_op:operation,task_id:id,baidu_job_id:job,bridge_ticket:ticket}
   };
   const c=new AbortController(),timer=setTimeout(()=>c.abort(),15000);
   try{
@@ -57,11 +61,14 @@ export async function triggerBaiduBridge(env,{op,task_id,baidu_job_id=""}){
   finally{clearTimeout(timer)}
 }
 
-export function bridgeAuthorized(req,env){
-  const expected=str(env.BAIDU_BRIDGE_SHARED_SECRET),actual=str(req.headers.get("x-three-center-bridge-secret"));
-  if(!expected||!actual||expected.length!==actual.length)return false;
-  let diff=0;for(let i=0;i<expected.length;i++)diff|=expected.charCodeAt(i)^actual.charCodeAt(i);
-  return diff===0;
+export async function digestBridgeTicket(ticket){
+  const h=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(str(ticket)));
+  return[...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+
+export function newBridgeTicket(){
+  const b=new Uint8Array(32);crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
 }
 
 export function normalizeBaiduInput(input={}){
