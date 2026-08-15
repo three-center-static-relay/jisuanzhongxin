@@ -12,16 +12,27 @@ def classify_cp_failure(text):
     s = str(text or "").lower()
     if any(x in s for x in ["permission denied", "access denied", "forbidden", "unauthorized", "无权限", "权限不足", "未授权"]):
         return "BAIDU_JOB_ACCESS_DENIED"
-    if any(x in s for x in ["running", "pending", "queued", "not finished", "not complete", "排队", "运行中", "尚未完成", "未完成"]):
-        return "BAIDU_JOB_NOT_FINISHED"
-    if any(x in s for x in ["three-center-result.json", "/home/aistudio/output", "no such file", "file not found", "result file", "结果文件"]):
-        return "BAIDU_RESULT_FILE_NOT_FOUND"
-    if any(x in s for x in ["job not found", "job_id not found", "job id not found", "invalid job", "invalid job_id", "jobid", "任务不存在", "任务id不存在", "任务 id 不存在"]):
-        return "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND"
-    if ("not found" in s or "不存在" in s) and "file" not in s and "文件" not in s:
-        return "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND"
     if any(x in s for x in ["expired", "过期"]):
         return "BAIDU_JOB_EXPIRED"
+    if any(x in s for x in ["running", "pending", "queued", "not finished", "not complete", "排队", "运行中", "尚未完成", "未完成"]):
+        return "BAIDU_JOB_NOT_FINISHED"
+    job_invalid = [
+        "job not found", "job_id not found", "job id not found", "job does not exist",
+        "could not find job", "invalid job", "invalid job_id", "invalid job id",
+        "任务不存在", "任务id不存在", "任务 id 不存在", "无此任务",
+    ]
+    if any(x in s for x in job_invalid):
+        return "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND"
+    if ("not found" in s or "does not exist" in s or "不存在" in s) and not any(x in s for x in ["file", "文件", "three-center-result.json"]):
+        return "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND"
+    explicit_file_missing = [
+        "no such file", "file not found", "result file not found", "result_file not found",
+        "文件不存在", "找不到文件", "结果文件不存在", "无法找到文件",
+    ]
+    if any(x in s for x in explicit_file_missing):
+        return "BAIDU_RESULT_FILE_NOT_FOUND"
+    if ("not found" in s or "不存在" in s) and any(x in s for x in ["three-center-result.json", "/home/aistudio/output", "file", "文件"]):
+        return "BAIDU_RESULT_FILE_NOT_FOUND"
     return "BAIDU_CP_UNKNOWN_ERROR"
 
 
@@ -59,19 +70,22 @@ def diagnostic_check(task_id, job_id):
 def selftest():
     cases = {
         "job not found": "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND",
+        "job not found while copying /home/aistudio/output/three-center-result.json": "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND",
         "任务ID不存在": "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND",
         "job is pending": "BAIDU_JOB_NOT_FINISHED",
         "任务排队中": "BAIDU_JOB_NOT_FINISHED",
         "No such file: /home/aistudio/output/three-center-result.json": "BAIDU_RESULT_FILE_NOT_FOUND",
+        "file not found: three-center-result.json": "BAIDU_RESULT_FILE_NOT_FOUND",
         "permission denied": "BAIDU_JOB_ACCESS_DENIED",
         "job expired": "BAIDU_JOB_EXPIRED",
+        "cp failed: /home/aistudio/output/three-center-result.json": "BAIDU_CP_UNKNOWN_ERROR",
         "unexpected transport error": "BAIDU_CP_UNKNOWN_ERROR",
     }
     for raw, expected in cases.items():
         actual = classify_cp_failure(raw)
         if actual != expected:
             raise AssertionError(f"CLASSIFY_MISMATCH:{raw}:{actual}:{expected}")
-    print('{"ok":true,"suite":"baidu-check-diagnostic-classifier","cases":8}')
+    print('{"ok":true,"suite":"baidu-check-diagnostic-classifier-v2","cases":11}')
     return 0
 
 
