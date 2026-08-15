@@ -5,6 +5,7 @@ export {CenterGate};
 
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
 let openEOHealth={at:0,value:null};
+let baiduHealth={at:0,value:null};
 
 async function openEOProbe(env){
   const now=Date.now();
@@ -32,6 +33,14 @@ async function openEOProbe(env){
   }
 }
 
+async function baiduProbe(env){
+  const now=Date.now();
+  if(baiduHealth.value&&now-baiduHealth.at<300000)return {...baiduHealth.value,cached_health:true};
+  const value=await probeBaiduAIStudio(env);
+  baiduHealth={at:now,value};
+  return value;
+}
+
 export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url);
@@ -42,8 +51,8 @@ export default {
     }
     if(req.method==="GET"&&u.pathname==="/v1/providers/baidu/meta")return json({ok:true,...baiduAIStudioMeta(),secret_echo:false});
     if(req.method==="GET"&&u.pathname==="/v1/providers/baidu/health"){
-      const p=probeBaiduAIStudio(env);
-      return json(p,p.automation_ready?200:503);
+      const p=await baiduProbe(env);
+      return json(p,p.manual_ready?200:503);
     }
     return guard.fetch(req,env,ctx);
   }
