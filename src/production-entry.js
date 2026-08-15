@@ -3,7 +3,7 @@ import {maybeHandleBaiduCircleCI} from "./baidu-circleci-router.js";
 import {maybeHandleModels} from "./model-router.js";
 import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {medicalImagingMeta} from "./medical-imaging-toolkit.js";
-import {modalCpuSelftest,modalHealth,modalMeta} from "./modal.js";
+import {modalCpuSelftest,modalGpuSelftest,modalHealth,modalMeta} from "./modal.js";
 export {CenterGate};
 
 async function normalizeMedicalImagingRequest(req){
@@ -27,6 +27,12 @@ export default {
       let body={};try{body=await req.json()}catch{}
       const n=body?.n===undefined?10000:Number(body.n);
       const p=await modalCpuSelftest(env,n);
+      return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}});
+    }
+    if(req.method==="POST"&&u.pathname==="/v1/providers/modal/selftest/gpu"){
+      let body={};try{body=await req.json()}catch{}
+      const n=body?.n===undefined?10000:Number(body.n);
+      const p=await modalGpuSelftest(env,n);
       return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}});
     }
     req=await normalizeMedicalImagingRequest(req);
