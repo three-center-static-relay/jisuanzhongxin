@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "compute-worker",
-  "main": "src/production-entry-baidu-h-pid.js",
+  "main": "src/production-entry-baidu-i-e2e.js",
   "compatibility_date": "2026-08-14",
   "workers_dev": true,
   "build": {"command": "node tests/predeploy.mjs && node tests/predeploy-circleci.mjs && node tests/model-library.mjs && node tests/universal-model-library.mjs && node tests/industry-specialist-recipes.mjs && node tests/kaggle-package-audit.mjs && node tests/medical-imaging-toolkit.mjs && node tests/benchmark-library.mjs"},
