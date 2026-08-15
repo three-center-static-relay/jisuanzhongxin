@@ -1,5 +1,3 @@
-import {ModalClient} from "modal";
-
 const PROVIDER="modal";
 const STARTER_FREE_CREDIT_USD_MONTHLY=30;
 
@@ -13,100 +11,62 @@ export function modalMeta(){
     free_credit_type:"recurring-monthly-current-plan",
     lifetime_free_guarantee:false,
     pricing_policy_can_change:true,
-    token_id_env:"MODAL_TOKEN_ID",
-    token_secret_env:"MODAL_TOKEN_SECRET",
-    authentication:"modal-api-token-pair",
-    official_sdk:true,
-    official_sdk_version:"0.9.0",
+    api_token_id_env:"MODAL_TOKEN_ID",
+    api_token_secret_env:"MODAL_TOKEN_SECRET",
+    endpoint_url_env:"MODAL_ENDPOINT_URL",
+    proxy_token_id_env:"MODAL_PROXY_TOKEN_ID",
+    proxy_token_secret_env:"MODAL_PROXY_TOKEN_SECRET",
+    runtime_transport:"https-web-function",
+    direct_cloudflare_sdk_supported:false,
+    direct_cloudflare_sdk_reason:"modal-js-uses-node-grpc-http2; Cloudflare Workers node:http2 is a non-functional compatibility stub",
+    bridge_required:true,
     cpu:true,
     gpu:true,
     paid_fallback:false,
     free_credit_only:true,
     arbitrary_code_route:false,
     route_eligible:false,
-    acceptance_state:"registered-awaiting-live-auth-and-compute-e2e"
+    acceptance_state:"https-bridge-required"
   };
 }
 
-function baseHealth(env){
-  const tokenId=String(env.MODAL_TOKEN_ID||"").trim();
-  const tokenSecret=String(env.MODAL_TOKEN_SECRET||"").trim();
-  const tokenIdFormatOk=/^ak-[A-Za-z0-9_-]+$/.test(tokenId);
-  const tokenSecretFormatOk=/^as-[A-Za-z0-9_-]+$/.test(tokenSecret);
-  return {tokenId,tokenSecret,configured:Boolean(tokenId&&tokenSecret),tokenIdFormatOk,tokenSecretFormatOk};
-}
-
-function grpcCodeName(code){
-  const n=Number(code);
-  return ({0:"OK",1:"CANCELLED",2:"UNKNOWN",3:"INVALID_ARGUMENT",4:"DEADLINE_EXCEEDED",5:"NOT_FOUND",6:"ALREADY_EXISTS",7:"PERMISSION_DENIED",8:"RESOURCE_EXHAUSTED",9:"FAILED_PRECONDITION",10:"ABORTED",11:"OUT_OF_RANGE",12:"UNIMPLEMENTED",13:"INTERNAL",14:"UNAVAILABLE",15:"DATA_LOSS",16:"UNAUTHENTICATED"})[n]||"UNRECOGNIZED";
-}
-
-function classifyModalError(e){
-  const code=Number.isFinite(Number(e?.code))?Number(e.code):null;
-  if(code===16)return"MODAL_UNAUTHENTICATED";
-  if(code===7)return"MODAL_PERMISSION_DENIED";
-  if(code===8)return"MODAL_RESOURCE_EXHAUSTED";
-  if(code===14)return"MODAL_SERVICE_UNAVAILABLE";
-  if(code===4)return"MODAL_AUTH_TIMEOUT";
-  const s=String(e?.message||e||"").toLowerCase();
-  if(s.includes("unauth")||s.includes("permission")||s.includes("credential")||s.includes("token"))return"MODAL_AUTH_FAILED";
-  if(s.includes("timeout")||s.includes("deadline"))return"MODAL_AUTH_TIMEOUT";
-  if(s.includes("fetch")||s.includes("network")||s.includes("connect")||s.includes("grpc"))return"MODAL_NETWORK_OR_TRANSPORT_FAILED";
-  return"MODAL_LIVE_PROBE_FAILED";
-}
-
-async function plainHttpsProbe(){
-  try{
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),5000);
-    try{
-      const r=await fetch("https://api.modal.com/",{method:"GET",redirect:"manual",signal:controller.signal});
-      return {https_reachable:true,https_status:r.status};
-    }finally{clearTimeout(timer)}
-  }catch{return {https_reachable:false,https_status:null}}
-}
+function cleanBaseUrl(v){return String(v||"").trim().replace(/\/+$/g,"")}
+function validHttpsUrl(v){try{const u=new URL(v);return u.protocol==="https:"}catch{return false}}
 
 export async function modalHealth(env){
-  const {tokenId,tokenSecret,configured,tokenIdFormatOk,tokenSecretFormatOk}=baseHealth(env);
-  const format={token_id_format_ok:tokenIdFormatOk,token_secret_format_ok:tokenSecretFormatOk};
-  if(!configured)return {
-    ok:false,provider:PROVIDER,configured:false,
-    token_id_configured:Boolean(tokenId),token_secret_configured:Boolean(tokenSecret),...format,
-    authenticated:false,live_probe:false,route_eligible:false,paid_fallback:false,free_credit_only:true,
-    acceptance_state:"credentials-required",secret_echo:false
+  const apiId=String(env.MODAL_TOKEN_ID||"").trim();
+  const apiSecret=String(env.MODAL_TOKEN_SECRET||"").trim();
+  const endpoint=cleanBaseUrl(env.MODAL_ENDPOINT_URL);
+  const proxyId=String(env.MODAL_PROXY_TOKEN_ID||"").trim();
+  const proxySecret=String(env.MODAL_PROXY_TOKEN_SECRET||"").trim();
+  const apiPairConfigured=Boolean(apiId&&apiSecret);
+  const bridgeConfigured=Boolean(endpoint&&proxyId&&proxySecret);
+  const base={
+    provider:PROVIDER,
+    api_token_pair_configured:apiPairConfigured,
+    api_token_id_format_ok:apiId?(/^ak-[A-Za-z0-9_-]+$/.test(apiId)):false,
+    api_token_secret_format_ok:apiSecret?(/^as-[A-Za-z0-9_-]+$/.test(apiSecret)):false,
+    direct_cloudflare_sdk_supported:false,
+    bridge_required:true,
+    endpoint_configured:Boolean(endpoint),
+    proxy_token_id_configured:Boolean(proxyId),
+    proxy_token_secret_configured:Boolean(proxySecret),
+    proxy_token_id_format_ok:proxyId?(/^wk-[A-Za-z0-9_-]+$/.test(proxyId)):false,
+    proxy_token_secret_format_ok:proxySecret?(/^ws-[A-Za-z0-9_-]+$/.test(proxySecret)):false,
+    paid_fallback:false,
+    free_credit_only:true,
+    route_eligible:false,
+    secret_echo:false
   };
-  if(!tokenIdFormatOk||!tokenSecretFormatOk)return {
-    ok:false,provider:PROVIDER,configured:true,
-    token_id_configured:true,token_secret_configured:true,...format,
-    authenticated:false,live_probe:false,error_class:"MODAL_CREDENTIAL_FORMAT_INVALID",
-    route_eligible:false,paid_fallback:false,free_credit_only:true,
-    acceptance_state:"credential-format-invalid",secret_echo:false
-  };
-  let client;
+  if(!bridgeConfigured)return {ok:false,...base,authenticated:false,live_probe:false,acceptance_state:"https-bridge-config-required"};
+  if(!validHttpsUrl(endpoint)||!/^wk-[A-Za-z0-9_-]+$/.test(proxyId)||!/^ws-[A-Za-z0-9_-]+$/.test(proxySecret))return {ok:false,...base,authenticated:false,live_probe:false,error_class:"MODAL_BRIDGE_CONFIG_INVALID",acceptance_state:"https-bridge-config-invalid"};
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),8000);
   try{
-    client=new ModalClient({tokenId,tokenSecret,timeoutMs:8000,maxRetries:0,maxThrottleWaitSecs:0});
-    const builderVersion=await client.getImageBuilderVersion();
-    return {
-      ok:true,provider:PROVIDER,configured:true,
-      token_id_configured:true,token_secret_configured:true,...format,
-      authenticated:true,live_probe:true,image_builder_version_present:Boolean(builderVersion),
-      route_eligible:false,paid_fallback:false,free_credit_only:true,
-      acceptance_state:"authenticated-awaiting-minimal-compute-e2e",secret_echo:false
-    };
+    const r=await fetch(`${endpoint}/health`,{method:"GET",headers:{"Modal-Key":proxyId,"Modal-Secret":proxySecret,"Accept":"application/json"},signal:controller.signal});
+    const ok=r.ok;
+    return {ok,...base,authenticated:ok,live_probe:true,http_status:r.status,acceptance_state:ok?"https-bridge-authenticated-awaiting-compute-e2e":"https-bridge-health-failed"};
   }catch(e){
-    const grpcCode=Number.isFinite(Number(e?.code))?Number(e.code):null;
-    const transport=grpcCode===14?await plainHttpsProbe():{https_reachable:null,https_status:null};
-    return {
-      ok:false,provider:PROVIDER,configured:true,
-      token_id_configured:true,token_secret_configured:true,...format,
-      authenticated:false,live_probe:true,error_class:classifyModalError(e),
-      error_name:String(e?.name||"Error").replace(/[^A-Za-z0-9_.-]/g,"").slice(0,80),
-      grpc_code:grpcCode,grpc_code_name:grpcCode===null?null:grpcCodeName(grpcCode),
-      ...transport,
-      route_eligible:false,paid_fallback:false,free_credit_only:true,
-      acceptance_state:"live-auth-failed",secret_echo:false
-    };
-  }finally{
-    try{client?.close()}catch{}
-  }
+    return {ok:false,...base,authenticated:false,live_probe:true,error_class:e?.name==="AbortError"?"MODAL_BRIDGE_TIMEOUT":"MODAL_BRIDGE_UNAVAILABLE",acceptance_state:"https-bridge-health-failed"};
+  }finally{clearTimeout(timer)}
 }

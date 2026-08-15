@@ -2,9 +2,6 @@
   "name": "compute-worker",
   "private": true,
   "scripts": {"stress": "node tests/stress.mjs"},
-  "dependencies": {
-    "modal": "0.9.0"
-  },
   "devDependencies": {
     "wrangler": "^4.0.0",
     "msw": "^2.0.0"
