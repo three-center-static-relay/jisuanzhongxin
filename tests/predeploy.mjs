@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import {extractKaggleResult,officialMeta as kaggleOfficialMeta} from "../src/kaggle-official.js";
 import {baiduAIStudioMeta,probeBaiduAIStudio} from "../src/baidu-aistudio.js";
+import {bceAuthorization,fixedBundle,baiduNativeMeta} from "../src/baidu-native.js";
 
 const expected={ok:true,task_id:"cpu-001",profile:"core",accelerator:"cpu"};
 const encoded=JSON.stringify(expected);
-
 assert.deepEqual(extractKaggleResult(`THREE_CENTER_RESULT:${encoded}`),expected);
 assert.deepEqual(extractKaggleResult(`[2026-08-15T00:00:00Z] stdout THREE_CENTER_RESULT:${encoded}\nfinished`),expected);
 assert.deepEqual(extractKaggleResult(`THREE_CENTER_RESULT:${encoded}\nTHREE_CENTER_RESULT:{bad-json}`),expected);
@@ -27,6 +27,37 @@ assert.equal(meta.daily_maintenance_required,false);
 assert.equal(meta.daily_checkin_required,false);
 assert.equal(meta.bonus_harvesting,false);
 assert.equal(meta.route_eligible,false);
+const nm=baiduNativeMeta();
+assert.equal(nm.payment_mode,"coupon");
+assert.equal(nm.acoin_allowed,false);
+assert.equal(nm.paid_fallback,false);
+assert.equal(nm.fixed_bundle_only,true);
+assert.equal(nm.arbitrary_code,false);
+assert.equal(nm.route_eligible,false);
+
+const sample=await bceAuthorization({
+  ak:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  sk:"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  method:"PUT",
+  path:"/v1/test/myfolder/readme.txt",
+  query:{partNumber:"9",uploadId:"a44cc9bab11cbd156984767aad637851"},
+  headers:{
+    host:"bj.bcebos.com",
+    "content-length":"8",
+    "content-md5":"NFzcPqhviddjRNnSOGo4rw==",
+    "content-type":"text/plain",
+    "x-bce-date":"2015-04-27T08:23:49Z"
+  },
+  timestamp:"2015-04-27T08:23:49Z",
+  expires:1800,
+  signedHeaderNames:null
+});
+assert.equal(sample.authorization,"bce-auth-v1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/2015-04-27T08:23:49Z/1800//d74a04362e6a848f5b39b15421cb449427f419c95a480fd6b8cf9fc783e2999e");
+const bundle=fixedBundle("baidu-smoke-001");
+assert.equal(bundle[0],0x50);assert.equal(bundle[1],0x4b);assert.equal(bundle[2],0x03);assert.equal(bundle[3],0x04);
+assert.ok(bundle.length>200);
+assert.ok(new TextDecoder().decode(bundle).includes("run.py"));
+assert.ok(new TextDecoder().decode(bundle).includes("/home/aistudio/output/three-center-result.json"));
 
 const noToken=await probeBaiduAIStudio({});
 assert.equal(noToken.configured,false);
@@ -69,4 +100,4 @@ try{
   globalThis.fetch=originalFetch;
 }
 
-console.log(JSON.stringify({ok:true,suite:"predeploy",kaggle_result_parser:true,kaggle_meta:true,baidu_policy:true,baidu_token_probe_mock:true,baidu_negative_auth:true,network:false}));
+console.log(JSON.stringify({ok:true,suite:"predeploy",kaggle_result_parser:true,kaggle_meta:true,baidu_policy:true,baidu_token_probe_mock:true,baidu_negative_auth:true,baidu_bce_signature:true,baidu_fixed_bundle:true,network:false}));
