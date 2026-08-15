@@ -14,10 +14,6 @@ import urllib.request
 BASE = pathlib.Path(__file__).resolve().parent
 JOB_TEMPLATE = BASE / "job" / "run.py"
 ALLOWED_OPS = {"SUBMIT", "CHECK", "FETCH", "CANCEL"}
-# AI Studio SDK's `aistudio job <pipeline_id> cp result_file local_path`
-# resolves result_file relative to the persisted output root.  The SDK obtains
-# that root from bosacl_ls_cp(...), then concatenates file_key + result_file.
-# Therefore the canonical path must be relative, not /home/aistudio/output/...
 RESULT_CANDIDATES = [
     "three-center-result.json",
     "output/three-center-result.json",
@@ -64,7 +60,7 @@ def api(method, path, body=None):
 
 
 def redact_cli(text):
-    value = str(text or "")[-1200:]
+    value = str(text or "")[-2000:]
     token = os.environ.get("BAIDU_AISTUDIO_ACCESS_TOKEN", "").strip()
     if token:
         value = value.replace(token, "[REDACTED]")
@@ -98,13 +94,17 @@ def auth(task_id, op):
     callback(task_id, op, "running", stage="aistudio_authenticated")
 
 
+def expected_pipeline_name(task_id):
+    return "three-center-" + re.sub(r"[^A-Za-z0-9._-]+", "-", str(task_id))[:48]
+
+
 def _id_from_obj(obj):
     if isinstance(obj, dict):
-        preferred = {"pipeline_id", "pipelineid", "job_id", "jobid"}
+        preferred = {"pipeline_id", "pipelineid", "job_id", "jobid", "pid"}
         fallback = {"id"}
         for key, value in obj.items():
             normalized = re.sub(r"[^a-z0-9]", "", str(key).lower())
-            if normalized in {"pipelineid", "jobid"} and value not in (None, ""):
+            if normalized in {"pipelineid", "jobid", "pid"} and value not in (None, ""):
                 return str(value).strip()
         for key, value in obj.items():
             if str(key).lower() in preferred and value not in (None, ""):
@@ -136,8 +136,8 @@ def parse_job_id(text):
         except Exception:
             pass
     patterns = [
-        r"(?:pipeline[_ -]?id|pipelineId|job[_ -]?id|jobId)\s*(?:[:=|]|\s)\s*['\"]?([A-Za-z0-9._:-]{3,128})",
-        r"['\"](?:pipeline_id|pipelineId|job_id|jobId)['\"]\s*:\s*['\"]?([A-Za-z0-9._:-]{3,128})",
+        r"(?:\bpid\b|pipeline[_ -]?id|pipelineId|job[_ -]?id|jobId)\s*(?:[:=|]|\s)\s*['\"]?([A-Za-z0-9._:-]{3,128})",
+        r"['\"](?:pid|pipeline_id|pipelineId|job_id|jobId)['\"]\s*:\s*['\"]?([A-Za-z0-9._:-]{3,128})",
     ]
     for pattern in patterns:
         m = re.search(pattern, text, re.I)
@@ -149,6 +149,82 @@ def parse_job_id(text):
             if m:
                 return m.group(1)
     raise RuntimeError("BAIDU_JOB_ID_NOT_FOUND")
+
+
+def classify_submit_failure(text):
+    s = redact_cli(text).lower()
+    if any(x in s for x in [
+        "余额不足", "算力点不足", "算力不足", "算力卡不足", "insufficient balance",
+        "insufficient credit", "insufficient coupon", "not enough balance", "not enough coupon",
+    ]):
+        return "BAIDU_COMPUTE_CREDIT_INSUFFICIENT"
+    if any(x in s for x in [
+        "没有权限", "无权限", "权限不足", "未授权", "forbidden", "unauthorized", "permission denied",
+    ]):
+        return "BAIDU_SUBMIT_ACCESS_DENIED"
+    if "13001" in s or "bos上传失败" in s or "bos upload" in s:
+        return "BAIDU_CODE_UPLOAD_FAILED"
+    if "11005" in s or "创建产线回调请求失败" in s:
+        return "BAIDU_CREATE_CALLBACK_FAILED"
+    if "11004" in s or "bos ak/sk申请失败" in s or "ak/sk" in s and "失败" in s:
+        return "BAIDU_BOSACL_FAILED"
+    if "11003" in s or "创建产线参数校验请求失败" in s or "request create pipeline" in s:
+        return "BAIDU_CREATE_PIPELINE_REJECTED"
+    if "10006" in s or "文件过大" in s or "file too large" in s:
+        return "BAIDU_CODE_PACKAGE_TOO_LARGE"
+    if "10004" in s or "文件不存在" in s or "file not found" in s:
+        return "BAIDU_CODE_PATH_INVALID"
+    if "未设置token" in s or ("token" in s and any(x in s for x in ["invalid", "expired", "无效", "过期"])):
+        return "BAIDU_SUBMIT_AUTH_REJECTED"
+    return "BAIDU_SUBMIT_NOT_CONFIRMED"
+
+
+def _select_pipeline_by_name(rows, expected_name):
+    exact = [x for x in (rows or []) if str(x.get("pipelineName") or "").strip() == expected_name]
+    if not exact:
+        return None
+    exact.sort(key=lambda x: str(x.get("createTime") or ""), reverse=True)
+    row = exact[0]
+    return row if str(row.get("pipelineId") or "").strip() else None
+
+
+def confirm_submitted_pipeline(task_id, submit_output):
+    """Treat only a query-visible pipeline as a successful submit.
+
+    aistudio-sdk 0.3.8 logs many business/API errors and returns from the CLI
+    handler without setting a non-zero process exit code. Therefore subprocess
+    returncode=0 is not sufficient evidence that a V100 pipeline exists.
+    """
+    token = env("BAIDU_AISTUDIO_ACCESS_TOKEN")
+    expected_name = expected_pipeline_name(task_id)
+    query_had_success = False
+    try:
+        from aistudio_sdk.requests import pipeline as pp_request
+        for attempt in range(4):
+            resp = pp_request.query(token, "", expected_name, "")
+            if isinstance(resp, dict) and int(resp.get("errorCode", -1)) == 0:
+                query_had_success = True
+                row = _select_pipeline_by_name(resp.get("result") or [], expected_name)
+                if row:
+                    return str(row.get("pipelineId")).strip()
+            if attempt < 3:
+                time.sleep(2)
+        # Do not rely solely on the server-side name filter.
+        resp = pp_request.query(token, "", "", "")
+        if isinstance(resp, dict) and int(resp.get("errorCode", -1)) == 0:
+            query_had_success = True
+            row = _select_pipeline_by_name(resp.get("result") or [], expected_name)
+            if row:
+                return str(row.get("pipelineId")).strip()
+    except Exception:
+        pass
+
+    classified = classify_submit_failure(submit_output)
+    if classified != "BAIDU_SUBMIT_NOT_CONFIRMED":
+        raise RuntimeError(classified)
+    if not query_had_success:
+        raise RuntimeError("BAIDU_SUBMIT_CONFIRM_QUERY_FAILED")
+    raise RuntimeError("BAIDU_SUBMIT_NOT_CONFIRMED")
 
 
 def fetch_result(task_id, job_id, dest):
@@ -179,7 +255,7 @@ def submit_and_wait(task_id):
         (work / "task.json").write_text(json.dumps(manifest, separators=(",", ":")), encoding="utf-8")
         p = run([
             "aistudio", "submit", "job",
-            "--name", f"three-center-{re.sub(r'[^A-Za-z0-9._-]+', '-', task_id)[:48]}",
+            "--name", expected_pipeline_name(task_id),
             "--path", str(work),
             "--cmd", "python run.py",
             "--device", "v100",
@@ -188,7 +264,7 @@ def submit_and_wait(task_id):
         ], label="AISTUDIO_SUBMIT_CLI")
         combined = (p.stdout or "") + "\n" + (p.stderr or "")
         callback(task_id, "SUBMIT", "running", stage="aistudio_submit_returned")
-        job_id = parse_job_id(combined)
+        job_id = confirm_submitted_pipeline(task_id, combined)
         callback(task_id, "SUBMIT", "running", baidu_job_id=job_id, payment="coupon", device="v100", gpus=1, stage="baidu_submitted")
         deadline = time.time() + timeout_seconds + 180
         result_path = work / "three-center-result.json"
@@ -237,6 +313,17 @@ def failure_class(exc):
         "AISTUDIO_SUBMIT_CLI_FAILED",
         "BAIDU_JOB_ID_NOT_FOUND",
         "BAIDU_RESULT_TIMEOUT",
+        "BAIDU_COMPUTE_CREDIT_INSUFFICIENT",
+        "BAIDU_SUBMIT_ACCESS_DENIED",
+        "BAIDU_CODE_UPLOAD_FAILED",
+        "BAIDU_CREATE_CALLBACK_FAILED",
+        "BAIDU_BOSACL_FAILED",
+        "BAIDU_CREATE_PIPELINE_REJECTED",
+        "BAIDU_CODE_PACKAGE_TOO_LARGE",
+        "BAIDU_CODE_PATH_INVALID",
+        "BAIDU_SUBMIT_AUTH_REJECTED",
+        "BAIDU_SUBMIT_CONFIRM_QUERY_FAILED",
+        "BAIDU_SUBMIT_NOT_CONFIRMED",
         "MISSING_BAIDU_AISTUDIO_ACCESS_TOKEN",
         "MISSING_COMPUTE_CALLBACK_URL",
         "MISSING_BRIDGE_TICKET",
@@ -276,13 +363,18 @@ def parser_selftest():
         actual = parse_job_id(raw)
         if actual != expected:
             raise AssertionError(f"PARSE_MISMATCH:{raw}:{actual}:{expected}")
-    try:
-        parse_job_id("submission response without an id")
-        raise AssertionError("MISSING_ID_NOT_REJECTED")
-    except RuntimeError as exc:
-        if str(exc) != "BAIDU_JOB_ID_NOT_FOUND":
-            raise
-    print(json.dumps({"ok": True, "suite": "baidu-job-id-parser", "cases": len(cases)}))
+    classifier_cases = {
+        "创建产线参数校验请求失败: 算力点余额不足": "BAIDU_COMPUTE_CREDIT_INSUFFICIENT",
+        "创建产线参数校验请求失败": "BAIDU_CREATE_PIPELINE_REJECTED",
+        "BOS上传失败": "BAIDU_CODE_UPLOAD_FAILED",
+        "创建产线回调请求失败": "BAIDU_CREATE_CALLBACK_FAILED",
+        "unknown submit message": "BAIDU_SUBMIT_NOT_CONFIRMED",
+    }
+    for raw, expected in classifier_cases.items():
+        actual = classify_submit_failure(raw)
+        if actual != expected:
+            raise AssertionError(f"SUBMIT_CLASS_MISMATCH:{raw}:{actual}:{expected}")
+    print(json.dumps({"ok": True, "suite": "baidu-submit-confirmation", "parser_cases": len(cases), "classifier_cases": len(classifier_cases)}))
     return 0
 
 
