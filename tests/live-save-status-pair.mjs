@@ -1,0 +1,3 @@
+const endpoint="https://compute-worker.a15280020511.workers.dev/__diag/kaggle-live-41d820f5-4211-47dc-bf08-0b5316d602ae";
+const c=new AbortController(),t=setTimeout(()=>c.abort(),30000);
+try{const r=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({action:"save_probe"}),signal:c.signal});const b=await r.json().catch(()=>null);if(r.status!==200)throw new Error(`SAVE_PROBE_HTTP_${r.status}`);if(b?.write_started===true){console.log(JSON.stringify({ok:true,class:"success"}));process.exit(0)}if(!(b?.rpc_status===400&&b?.rest_status===404))throw new Error("STATUS_PAIR_NOT_400_404");console.log(JSON.stringify({ok:true,rpc_status:400,rest_status:404}))}finally{clearTimeout(t)}
