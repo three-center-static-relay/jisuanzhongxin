@@ -3,7 +3,9 @@ const taskId="live-sdk-cpu-mirror-002";
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function post(action){const c=new AbortController(),t=setTimeout(()=>c.abort(),30000);try{const r=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({action,task_id:taskId}),signal:c.signal});return{status:r.status,body:await r.json().catch(()=>null)}}finally{clearTimeout(t)}}
 const start=await post("start");
-if(start.status!==200||start.body?.ok!==true||start.body?.status_code!==202||start.body?.status!=="running")throw new Error(`KAGGLE_CPU2_START_FAILED:${JSON.stringify(start.body)}`);
+const started=start.status===200&&start.body?.ok===true&&start.body?.status_code===202&&start.body?.status==="running";
+const existing=start.status===200&&start.body?.status_code===409&&["DUPLICATE_TASK","BUSY"].includes(String(start.body?.error||""));
+if(!started&&!existing)throw new Error(`KAGGLE_CPU2_START_FAILED:${JSON.stringify(start.body)}`);
 let last=null;
 for(let i=0;i<60;i++){
   await sleep(i===0?3000:10000);
@@ -15,7 +17,7 @@ for(let i=0;i<60;i++){
     if(inner?.verification?.ok!==true||inner?.temporary_kernel_deleted!==true||r?.task_id!==taskId||r?.profile!=="core"||r?.accelerator!=="cpu"||!(Number(r?.pi)>3.10&&Number(r?.pi)<3.18)||!(Number(r?.linear_residual)<=1e-6))throw new Error(`KAGGLE_CPU2_RESULT_INVALID:${JSON.stringify({verification:inner?.verification,cleanup:inner?.temporary_kernel_deleted,result:r})}`);
     const receipt=await post("status"),stored=receipt.body?.body;
     if(stored?.status!=="completed"||stored?.verification?.ok!==true||stored?.temporary_kernel_deleted!==true||!stored?.result_digest)throw new Error(`KAGGLE_CPU2_RECEIPT_INVALID:${JSON.stringify(stored)}`);
-    console.log(JSON.stringify({ok:true,phase:"real-kaggle-cpu-e2e",task_id:taskId,status:"completed",pi:r.pi,linear_residual:r.linear_residual,verification_ok:true,temporary_kernel_deleted:true,result_digest_present:true}));
+    console.log(JSON.stringify({ok:true,phase:"real-kaggle-cpu-e2e",task_id:taskId,status:"completed",started_now:started,pi:r.pi,linear_residual:r.linear_residual,verification_ok:true,temporary_kernel_deleted:true,result_digest_present:true}));
     process.exit(0);
   }
   throw new Error(`KAGGLE_CPU2_TERMINAL_FAILED:${JSON.stringify(last.body)}`);
