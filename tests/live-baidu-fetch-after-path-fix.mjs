@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+// retrigger: 2026-08-15T20:35+08:00; logic unchanged
 const URL="https://compute-worker.a15280020511.workers.dev/__acceptance/baidu-existing-v100-20260815d";
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function read(r){const text=await r.text();try{return text?JSON.parse(text):{}}catch{return{raw:text.slice(0,500)}}}
