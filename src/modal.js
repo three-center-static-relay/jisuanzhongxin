@@ -55,6 +55,17 @@ function classifyModalError(e){
   return"MODAL_LIVE_PROBE_FAILED";
 }
 
+async function plainHttpsProbe(){
+  try{
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),5000);
+    try{
+      const r=await fetch("https://api.modal.com/",{method:"GET",redirect:"manual",signal:controller.signal});
+      return {https_reachable:true,https_status:r.status};
+    }finally{clearTimeout(timer)}
+  }catch{return {https_reachable:false,https_status:null}}
+}
+
 export async function modalHealth(env){
   const {tokenId,tokenSecret,configured,tokenIdFormatOk,tokenSecretFormatOk}=baseHealth(env);
   const format={token_id_format_ok:tokenIdFormatOk,token_secret_format_ok:tokenSecretFormatOk};
@@ -84,12 +95,14 @@ export async function modalHealth(env){
     };
   }catch(e){
     const grpcCode=Number.isFinite(Number(e?.code))?Number(e.code):null;
+    const transport=grpcCode===14?await plainHttpsProbe():{https_reachable:null,https_status:null};
     return {
       ok:false,provider:PROVIDER,configured:true,
       token_id_configured:true,token_secret_configured:true,...format,
       authenticated:false,live_probe:true,error_class:classifyModalError(e),
       error_name:String(e?.name||"Error").replace(/[^A-Za-z0-9_.-]/g,"").slice(0,80),
       grpc_code:grpcCode,grpc_code_name:grpcCode===null?null:grpcCodeName(grpcCode),
+      ...transport,
       route_eligible:false,paid_fallback:false,free_credit_only:true,
       acceptance_state:"live-auth-failed",secret_echo:false
     };
