@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-// trigger 2026-08-15T20:22+08:00
+// diagnostic candidate 2: existing job not finished
 const BASE="https://compute-worker.a15280020511.workers.dev/__acceptance/baidu-existing-v100-20260815d";
 const CHECK=BASE+"/check";
-const EXPECTED="BAIDU_JOB_ID_INVALID_OR_NOT_FOUND";
+const EXPECTED="BAIDU_JOB_NOT_FINISHED";
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function read(r){const text=await r.text();try{return text?JSON.parse(text):{}}catch{return{raw:text.slice(0,500)}}}
 
