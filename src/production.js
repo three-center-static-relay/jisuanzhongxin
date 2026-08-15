@@ -6,6 +6,12 @@ import {introspect as kaggleIntrospect,officialMeta as kaggleOfficialMeta} from 
 export {CenterGate};
 
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
+const KAGGLE_ACCEPT_PATH="/__diag/kaggle-current-accept-20260815-7b4f29d1";
+const KAGGLE_ACCEPT_EXPIRES=Date.parse("2026-08-15T06:20:00Z");
+const KAGGLE_ACCEPT_TASKS={
+  "live-current-cpu-20260815a":{profile:"core",gpu:false,timeout_seconds:420,input:{matrix_size:256,monte_carlo_samples:250000,seed:20260815}},
+  "live-current-t4-20260815a":{profile:"gpu",gpu:true,timeout_seconds:720,input:{matrix_size:1024,rounds:2,seed:20260815}}
+};
 let openEOHealth={at:0,value:null};
 let baiduHealth={at:0,value:null};
 let googleEEHealth={at:0,value:null};
@@ -16,8 +22,25 @@ async function baiduProbe(env){const now=Date.now();if(baiduHealth.value&&now-ba
 async function googleEEProbe(env){const now=Date.now();if(googleEEHealth.value&&now-googleEEHealth.at<300000)return {...googleEEHealth.value,cached_health:true};try{const p=await probeEarthEngine(env,{compute:false});const value={ok:p.ok===true,provider:"google-earth-engine",configured:p.configured===true,oauth:p.oauth===true,registration_state:p.registration_state||"UNKNOWN",project_source:p.project_source||null,secret_echo:false};googleEEHealth={at:now,value};return value}catch(e){const value={ok:false,provider:"google-earth-engine",configured:Boolean(env.GOOGLE_EE_SERVICE_ACCOUNT_JSON),oauth:false,error_class:String(e?.message||"GOOGLE_EE_PROBE_FAILED"),http_status:Number(e?.status||0)||null,secret_echo:false};googleEEHealth={at:now,value};return value}}
 async function kaggleProbe(env){const now=Date.now();if(kaggleHealth.value&&now-kaggleHealth.at<300000)return {...kaggleHealth.value,cached_health:true};try{const who=await kaggleIntrospect(env),value={ok:who.active===true,provider:"kaggle",configured:Boolean(env.KAGGLE_API_TOKEN),authenticated:who.active===true,username_resolved:Boolean(who.username),business_e2e:false,secret_echo:false};kaggleHealth={at:now,value};return value}catch(e){const value={ok:false,provider:"kaggle",configured:Boolean(env.KAGGLE_API_TOKEN),authenticated:false,business_e2e:false,error_class:String(e?.message||"KAGGLE_PROBE_FAILED"),http_status:Number(e?.status||0)||null,secret_echo:false};kaggleHealth={at:now,value};return value}}
 async function googleEESelftest(env){try{const tiny=await probeEarthEngine(env,{compute:true}),stress=await stressEarthEngine(env),ok=tiny.ok===true&&tiny.compute_ok===true&&stress.ok===true;return{status:ok?200:503,body:{ok,provider:"google-earth-engine",business_e2e:true,tiny_compute_ok:tiny.compute_ok===true,parallel_requests:stress.parallel_requests,parallel_all_correct:stress.parallel_all_correct===true,parallel_http_statuses:stress.parallel_http_statuses,geospatial_graph_ok:stress.geospatial_graph_ok===true,negative_request_rejected:stress.negative_request_rejected===true,negative_http_status:stress.negative_http_status,elapsed_ms:stress.elapsed_ms,secret_echo:false}}}catch(e){return{status:503,body:{ok:false,provider:"google-earth-engine",business_e2e:true,error_class:String(e?.message||"GOOGLE_EE_SELFTEST_FAILED"),http_status:Number(e?.status||0)||null,secret_echo:false}}}}
+async function kaggleAccept(req,env,ctx){
+  if(Date.now()>KAGGLE_ACCEPT_EXPIRES)return json({ok:false,error:"DIAG_EXPIRED"},410);
+  const b=await req.json().catch(()=>({})),taskId=String(b.task_id||""),action=String(b.action||""),spec=KAGGLE_ACCEPT_TASKS[taskId];
+  if(!spec)return json({ok:false,error:"INVALID_TASK_ID"},400);
+  if(action==="start"){
+    const r=await guard.fetch(new Request("https://compute.internal/v1/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({task_id:taskId,...spec})}),env,ctx);
+    const out=await r.json().catch(()=>null);
+    return json({ok:r.status===202,status_code:r.status,task_id:taskId,status:out?.status||null,error:out?.error||null,message:out?.message?String(out.message).slice(0,240):null,machine_shape:out?.machine_shape||null,secret_echo:false},200);
+  }
+  if(action==="status"){
+    const r=await guard.fetch(new Request("https://compute.internal/v1/status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({task_id:taskId})}),env,ctx);
+    const out=await r.json().catch(()=>null);
+    return json({status_code:r.status,body:out,secret_echo:false},200);
+  }
+  return json({ok:false,error:"INVALID_ACTION"},400);
+}
 
 export default {async fetch(req,env,ctx){const u=new URL(req.url);
+  if(req.method==="POST"&&u.pathname===KAGGLE_ACCEPT_PATH)return kaggleAccept(req,env,ctx);
   if(req.method==="GET"&&u.pathname==="/v1/providers/openeo/meta")return json({ok:true,provider:"copernicus-openeo",...openEOMeta(),secret_echo:false});
   if(req.method==="GET"&&u.pathname==="/v1/providers/openeo/health"){const p=await openEOProbe(env);return json(p,p.ok?200:503)}
   if(req.method==="GET"&&u.pathname==="/v1/providers/baidu/meta")return json({ok:true,...baiduAIStudioMeta(),secret_echo:false});
