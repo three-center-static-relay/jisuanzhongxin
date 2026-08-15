@@ -29,6 +29,7 @@ jobs:
           command: python -m pip install --disable-pip-version-check --no-input "aistudio-sdk==0.3.8"
       - run:
           name: Run bounded Baidu CLI bridge
+          when: always
           no_output_timeout: 10m
           environment:
             BRIDGE_OP: << pipeline.parameters.bridge_op >>
