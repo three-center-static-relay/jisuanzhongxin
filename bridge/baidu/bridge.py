@@ -14,10 +14,14 @@ import urllib.request
 BASE = pathlib.Path(__file__).resolve().parent
 JOB_TEMPLATE = BASE / "job" / "run.py"
 ALLOWED_OPS = {"SUBMIT", "CHECK", "FETCH", "CANCEL"}
+# AI Studio SDK's `aistudio job <pipeline_id> cp result_file local_path`
+# resolves result_file relative to the persisted output root.  The SDK obtains
+# that root from bosacl_ls_cp(...), then concatenates file_key + result_file.
+# Therefore the canonical path must be relative, not /home/aistudio/output/...
 RESULT_CANDIDATES = [
-    "/home/aistudio/output/three-center-result.json",
-    "./output/three-center-result.json",
+    "three-center-result.json",
     "output/three-center-result.json",
+    "./output/three-center-result.json",
 ]
 SAFE_STAGE = {
     "circleci_started",
