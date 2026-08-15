@@ -1,16 +1,14 @@
 import {listTools} from "./kaggle-mcp.js";
 const norm=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");
-function pushTool(tools){
-  const exact=tools.find(t=>String(t?.name||"").toLowerCase()==="kernel_push");
-  if(exact)return exact;
-  return tools.map(t=>{const x=`${t?.name||""} ${t?.description||""}`.toLowerCase();let s=0;if(/kernel|notebook/.test(x))s+=4;if(/push|save|create/.test(x))s+=8;if(/competition/.test(x))s-=12;return{t,s}}).sort((a,b)=>b.s-a.s)[0]?.t||null;
-}
+const hasAny=(s,a)=>a.some(x=>s.has(x));
+function score(t){const x=`${t?.name||""} ${t?.description||""}`.toLowerCase(),keys=Object.keys(t?.inputSchema?.properties||{}),p=new Set(keys.map(norm));const hasCode=hasAny(p,["text","source","code"]);if(!hasCode)return-1000;if(/competition|dataset|model/.test(x)&&!/kernel|notebook|code/.test(x))return-1000;let s=40;if(hasAny(p,["title","name"]))s+=16;if(p.has("language"))s+=10;if(hasAny(p,["kerneltype","notebooktype","type"]))s+=10;if(hasAny(p,["isprivate","private"]))s+=6;if(/kernel|notebook|code/.test(x))s+=8;if(/push|save|create|run|execute/.test(x))s+=4;return s}
+function pushTool(tools){const a=tools.map(t=>({t,s:score(t)})).sort((x,y)=>y.s-x.s);return a[0]?.s>=40?a[0].t:null}
 export async function probePushSchema(env){
   const tools=await listTools(env),tool=pushTool(tools);
   if(!tool)return{ok:false,push_tool_present:false};
   const props=tool?.inputSchema?.properties||{},required=Array.isArray(tool?.inputSchema?.required)?tool.inputSchema.required:[];
   const keys=Object.keys(props),nk=new Set(keys.map(norm));
-  const supported=new Set(["title","name","text","source","code","language","kerneltype","notebooktype","type","isprivate","private","enablegpu","gpu","enabletpu","tpu","enableinternet","internet","machineshape","accelerator"]);
+  const supported=new Set(["title","name","text","source","code","language","kerneltype","notebooktype","type","isprivate","private","enablegpu","gpu","enabletpu","tpu","enableinternet","internet","machineshape","accelerator","username","owner","ownerslug","kernelslug","notebookslug","kernel","notebook","ref","slug"]);
   const unknownRequired=required.filter(k=>!supported.has(norm(k)));
   return{
     ok:true,
@@ -21,7 +19,7 @@ export async function probePushSchema(env){
     accepts_language:nk.has("language"),
     accepts_kernel_type:nk.has("kerneltype")||nk.has("notebooktype")||nk.has("type"),
     accepts_private:nk.has("isprivate")||nk.has("private"),
-    accepts_slug:nk.has("slug")||nk.has("ref")||nk.has("kernel")||nk.has("notebook"),
+    accepts_identity:["username","owner","ownerslug","kernelslug","notebookslug","kernel","notebook","ref","slug"].some(k=>nk.has(k)),
     required_count:required.length,
     required_supported:unknownRequired.length===0,
     unknown_required_count:unknownRequired.length,
