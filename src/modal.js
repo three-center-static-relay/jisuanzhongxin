@@ -31,7 +31,9 @@ export function modalMeta(){
 function baseHealth(env){
   const tokenId=String(env.MODAL_TOKEN_ID||"").trim();
   const tokenSecret=String(env.MODAL_TOKEN_SECRET||"").trim();
-  return {tokenId,tokenSecret,configured:Boolean(tokenId&&tokenSecret)};
+  const tokenIdFormatOk=/^ak-[A-Za-z0-9_-]+$/.test(tokenId);
+  const tokenSecretFormatOk=/^as-[A-Za-z0-9_-]+$/.test(tokenSecret);
+  return {tokenId,tokenSecret,configured:Boolean(tokenId&&tokenSecret),tokenIdFormatOk,tokenSecretFormatOk};
 }
 
 function classifyModalError(e){
@@ -43,12 +45,20 @@ function classifyModalError(e){
 }
 
 export async function modalHealth(env){
-  const {tokenId,tokenSecret,configured}=baseHealth(env);
+  const {tokenId,tokenSecret,configured,tokenIdFormatOk,tokenSecretFormatOk}=baseHealth(env);
+  const format={token_id_format_ok:tokenIdFormatOk,token_secret_format_ok:tokenSecretFormatOk};
   if(!configured)return {
     ok:false,provider:PROVIDER,configured:false,
-    token_id_configured:Boolean(tokenId),token_secret_configured:Boolean(tokenSecret),
+    token_id_configured:Boolean(tokenId),token_secret_configured:Boolean(tokenSecret),...format,
     authenticated:false,live_probe:false,route_eligible:false,paid_fallback:false,free_credit_only:true,
     acceptance_state:"credentials-required",secret_echo:false
+  };
+  if(!tokenIdFormatOk||!tokenSecretFormatOk)return {
+    ok:false,provider:PROVIDER,configured:true,
+    token_id_configured:true,token_secret_configured:true,...format,
+    authenticated:false,live_probe:false,error_class:"MODAL_CREDENTIAL_FORMAT_INVALID",
+    route_eligible:false,paid_fallback:false,free_credit_only:true,
+    acceptance_state:"credential-format-invalid",secret_echo:false
   };
   let client;
   try{
@@ -56,7 +66,7 @@ export async function modalHealth(env){
     const builderVersion=await client.getImageBuilderVersion();
     return {
       ok:true,provider:PROVIDER,configured:true,
-      token_id_configured:true,token_secret_configured:true,
+      token_id_configured:true,token_secret_configured:true,...format,
       authenticated:true,live_probe:true,image_builder_version_present:Boolean(builderVersion),
       route_eligible:false,paid_fallback:false,free_credit_only:true,
       acceptance_state:"authenticated-awaiting-minimal-compute-e2e",secret_echo:false
@@ -64,8 +74,9 @@ export async function modalHealth(env){
   }catch(e){
     return {
       ok:false,provider:PROVIDER,configured:true,
-      token_id_configured:true,token_secret_configured:true,
+      token_id_configured:true,token_secret_configured:true,...format,
       authenticated:false,live_probe:true,error_class:classifyModalError(e),
+      error_name:String(e?.name||"Error").replace(/[^A-Za-z0-9_.-]/g,"").slice(0,80),
       route_eligible:false,paid_fallback:false,free_credit_only:true,
       acceptance_state:"live-auth-failed",secret_echo:false
     };
