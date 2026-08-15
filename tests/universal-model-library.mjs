@@ -22,7 +22,7 @@ const risk=runLocalModel("historical_var_es",{alpha:0.95,returns:[0.01,-0.02,0.0
 assert.equal(runLocalModel("credit_expected_loss",{exposures:[{id:"x",pd:0.02,lgd:0.4,ead:100000}]}).total_expected_loss,800);
 const pert=runLocalModel("pert_schedule",{tasks:[{id:"a",duration:2},{id:"b",duration:3,dependencies:["a"]},{id:"c",duration:1,dependencies:["a"]},{id:"d",duration:4,dependencies:["b","c"]}]});assert.deepEqual(pert.critical_path,["a","b","d"]);assert.equal(pert.project_expected_duration,9);
 
-const summary=industrySummary();assert.ok(summary.industry_pack_count>=18);assert.ok(summary.workflow_count>=6);assert.equal(summary.calibration_state,"deferred-until-benchmark-library");assert.equal(STANDARD_WORKFLOWS.open_location_intelligence.observed_lbs,false);assert.equal(STANDARD_WORKFLOWS.open_location_intelligence.calibration,"deferred-until-benchmark-library");
+const summary=industrySummary();assert.ok(summary.industry_pack_count>=18);assert.ok(summary.workflow_count>=6);assert.equal(summary.calibration_state,"benchmark-guidance-v1-active");assert.equal(STANDARD_WORKFLOWS.open_location_intelligence.observed_lbs,false);assert.equal(STANDARD_WORKFLOWS.open_location_intelligence.calibration,"benchmark-guidance-v1");
 for(const [packId,pack] of Object.entries(INDUSTRY_PACKS))for(const ref of pack.models)assert.ok(LOCAL_MODELS[ref]||registry.has(ref),`${packId}: invalid model ref ${ref}`);
 
 const recipes=recipeMeta();assert.equal(recipes.arbitrary_code,false);assert.equal(recipes.enable_internet,false);assert.equal(recipes.semantic_aliasing,false);
@@ -37,5 +37,7 @@ const calls=[],oldFetch=globalThis.fetch;
 try{
   globalThis.fetch=async(url,init={})=>{const body=init.body?JSON.parse(init.body):{};calls.push({url:String(url),body});if(String(url).includes("IntrospectToken"))return new Response(JSON.stringify({active:true,username:"tester",userId:1,scope:"read write"}),{status:200,headers:{"content-type":"application/json"}});if(String(url).includes("SaveKernel"))return new Response(JSON.stringify({ref:"tester/model-recipe",versionNumber:1}),{status:200,headers:{"content-type":"application/json"}});throw new Error("UNEXPECTED_FETCH:"+url)};
   const out=await dispatch({KAGGLE_API_TOKEN:"secret"},{task_id:"model-recipe-test",profile:"model",input:{model_recipe:{model_id:"policy_economics.econometrics.ols",args:{X:[[1],[2],[3]],y:[2,4,6]}}},timeout_seconds:300,gpu:false});assert.equal(out.machine_shape,"cpu");const save=calls.find(x=>x.url.includes("SaveKernel"));assert.ok(save);assert.equal(save.body.enableInternet,false);assert.equal(save.body.isPrivate,true);assert.equal(save.body.enableGpu,false);assert.ok(String(save.body.text).includes("model-recipe"));assert.equal(String(save.body.text).includes("pip install"),false);
-}finally{globalThis.fetch=oldFetch}
-console.log(JSON.stringify({ok:true,suite:"universal-model-library",industry_packs:summary.industry_pack_count,local_models:Object.keys(LOCAL_MODELS).length,recipe_methods:recipes.methods.length,arbitrary_code:false,calibration_deferred:true,observed_lbs_claim:false,semantic_recipe_checks:true}));
+}finally{
+  globalThis.fetch=oldFetch
+}
+console.log(JSON.stringify({ok:true,suite:"universal-model-library",industry_packs:summary.industry_pack_count,local_models:Object.keys(LOCAL_MODELS).length,recipe_methods:recipes.methods.length,arbitrary_code:false,local_calibration_deferred:true,workflow_benchmark_guidance_active:true,observed_lbs_claim:false,semantic_recipe_checks:true}));
