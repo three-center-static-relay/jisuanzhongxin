@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+// retrigger 2026-08-15 after Cloudflare skipped prior build; logic unchanged
 const BASE="https://compute-worker.a15280020511.workers.dev/__acceptance/baidu-existing-v100-20260815d";
 const CHECK=BASE+"/check";
 const allowed=new Set([
