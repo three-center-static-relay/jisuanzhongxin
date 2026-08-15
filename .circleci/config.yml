@@ -13,6 +13,9 @@ parameters:
   baidu_job_id:
     type: string
     default: ""
+  bridge_ticket:
+    type: string
+    default: ""
 
 jobs:
   baidu-cli-bridge:
@@ -31,6 +34,7 @@ jobs:
             BRIDGE_OP: << pipeline.parameters.bridge_op >>
             BRIDGE_TASK_ID: << pipeline.parameters.task_id >>
             BRIDGE_BAIDU_JOB_ID: << pipeline.parameters.baidu_job_id >>
+            BRIDGE_TICKET: << pipeline.parameters.bridge_ticket >>
           command: python bridge/baidu/bridge.py
 
 workflows:
