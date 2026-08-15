@@ -36,7 +36,18 @@ function baseHealth(env){
   return {tokenId,tokenSecret,configured:Boolean(tokenId&&tokenSecret),tokenIdFormatOk,tokenSecretFormatOk};
 }
 
+function grpcCodeName(code){
+  const n=Number(code);
+  return ({0:"OK",1:"CANCELLED",2:"UNKNOWN",3:"INVALID_ARGUMENT",4:"DEADLINE_EXCEEDED",5:"NOT_FOUND",6:"ALREADY_EXISTS",7:"PERMISSION_DENIED",8:"RESOURCE_EXHAUSTED",9:"FAILED_PRECONDITION",10:"ABORTED",11:"OUT_OF_RANGE",12:"UNIMPLEMENTED",13:"INTERNAL",14:"UNAVAILABLE",15:"DATA_LOSS",16:"UNAUTHENTICATED"})[n]||"UNRECOGNIZED";
+}
+
 function classifyModalError(e){
+  const code=Number.isFinite(Number(e?.code))?Number(e.code):null;
+  if(code===16)return"MODAL_UNAUTHENTICATED";
+  if(code===7)return"MODAL_PERMISSION_DENIED";
+  if(code===8)return"MODAL_RESOURCE_EXHAUSTED";
+  if(code===14)return"MODAL_SERVICE_UNAVAILABLE";
+  if(code===4)return"MODAL_AUTH_TIMEOUT";
   const s=String(e?.message||e||"").toLowerCase();
   if(s.includes("unauth")||s.includes("permission")||s.includes("credential")||s.includes("token"))return"MODAL_AUTH_FAILED";
   if(s.includes("timeout")||s.includes("deadline"))return"MODAL_AUTH_TIMEOUT";
@@ -72,11 +83,13 @@ export async function modalHealth(env){
       acceptance_state:"authenticated-awaiting-minimal-compute-e2e",secret_echo:false
     };
   }catch(e){
+    const grpcCode=Number.isFinite(Number(e?.code))?Number(e.code):null;
     return {
       ok:false,provider:PROVIDER,configured:true,
       token_id_configured:true,token_secret_configured:true,...format,
       authenticated:false,live_probe:true,error_class:classifyModalError(e),
       error_name:String(e?.name||"Error").replace(/[^A-Za-z0-9_.-]/g,"").slice(0,80),
+      grpc_code:grpcCode,grpc_code_name:grpcCode===null?null:grpcCodeName(grpcCode),
       route_eligible:false,paid_fallback:false,free_credit_only:true,
       acceptance_state:"live-auth-failed",secret_echo:false
     };
