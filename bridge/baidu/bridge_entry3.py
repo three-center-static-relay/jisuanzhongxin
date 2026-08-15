@@ -36,33 +36,85 @@ def classify_cp_failure(text):
     return "BAIDU_CP_UNKNOWN_ERROR"
 
 
+def _fetch_with_pipeline_id(pipeline_id, dest):
+    last = ""
+    for remote in impl.RESULT_CANDIDATES:
+        p = impl.run(
+            ["aistudio", "job", pipeline_id, "cp", remote, str(dest)],
+            check=False,
+            label="AISTUDIO_RESULT_CLI",
+        )
+        combined = impl.redact_cli((p.stderr or "") + "\n" + (p.stdout or ""))
+        if p.returncode == 0 and dest.exists() and dest.stat().st_size <= 65536:
+            try:
+                import json
+                return json.loads(dest.read_text(encoding="utf-8")), combined
+            except Exception:
+                dest.unlink(missing_ok=True)
+                last = "RESULT_JSON_INVALID"
+                continue
+        if combined.strip():
+            last = combined
+    return None, last
+
+
+def resolve_pipeline_id(task_id):
+    """Recover the real AI Studio pipeline id by the deterministic task name.
+
+    AI Studio SDK 0.3.8 prints a PrettyTable headed `pid | name | status | ...`.
+    Older parsing treated that table as if the id followed the name, which can
+    persist a non-id token. Querying by the exact deterministic name is bounded,
+    read-only, and does not submit another GPU job.
+    """
+    expected = parser_impl.expected_task_name(task_id)
+    if not expected:
+        return None
+    p = impl.run(
+        ["aistudio", "jobs", "-n", expected],
+        check=False,
+        label="AISTUDIO_JOBS_CLI",
+    )
+    combined = impl.redact_cli((p.stdout or "") + "\n" + (p.stderr or ""))
+    if p.returncode != 0 or not combined.strip():
+        return None
+    try:
+        return parser_impl.parse_job_id(combined)
+    except Exception:
+        return None
+
+
 def diagnostic_check(task_id, job_id):
     if not job_id:
         raise RuntimeError("MISSING_BAIDU_JOB_ID")
+    # Keep callbacks tied to the stored task identity. If recovery finds a
+    # corrected pipeline id, use it only inside CircleCI; omitting it from the
+    # completion callback prevents Cloudflare's mismatch guard from rejecting
+    # a valid result for this legacy task.
     impl.callback(task_id, "CHECK", "running", baidu_job_id=job_id, stage="result_polling")
-    last = ""
     with tempfile.TemporaryDirectory(prefix="three-center-check-") as td:
         dest = pathlib.Path(td) / "three-center-result.json"
-        for remote in impl.RESULT_CANDIDATES:
-            p = impl.run(
-                ["aistudio", "job", job_id, "cp", remote, str(dest)],
-                check=False,
-                label="AISTUDIO_RESULT_CLI",
-            )
-            combined = impl.redact_cli((p.stderr or "") + "\n" + (p.stdout or ""))
-            if p.returncode == 0 and dest.exists() and dest.stat().st_size <= 65536:
-                try:
-                    import json
-                    result = json.loads(dest.read_text(encoding="utf-8"))
-                    impl.callback(task_id, "FETCH", "completed", baidu_job_id=job_id, result=result, stage="result_retrieved")
+        result, last = _fetch_with_pipeline_id(job_id, dest)
+        if result is not None:
+            impl.callback(task_id, "FETCH", "completed", baidu_job_id=job_id, result=result, stage="result_retrieved")
+            return 0
+
+        failure = classify_cp_failure(last)
+        if failure == "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND":
+            recovered = resolve_pipeline_id(task_id)
+            if recovered and recovered != job_id:
+                dest.unlink(missing_ok=True)
+                result, recovered_last = _fetch_with_pipeline_id(recovered, dest)
+                if result is not None:
+                    impl.callback(task_id, "FETCH", "completed", result=result, stage="result_retrieved")
                     return 0
-                except Exception:
-                    dest.unlink(missing_ok=True)
-                    last = "RESULT_JSON_INVALID"
-                    continue
-            if combined.strip():
-                last = combined
-    failure = classify_cp_failure(last)
+                failure = classify_cp_failure(recovered_last)
+                if failure == "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND":
+                    failure = "BAIDU_RECOVERED_PIPELINE_ID_INVALID"
+            elif recovered == job_id:
+                failure = "BAIDU_STORED_PIPELINE_ID_CONFIRMED_INVALID"
+            else:
+                failure = "BAIDU_PIPELINE_ID_RECOVERY_FAILED"
+
     impl.callback(task_id, "CHECK", "failed", baidu_job_id=job_id, error=failure, failure_class=failure, stage="result_polling")
     return 2
 
@@ -85,7 +137,7 @@ def selftest():
         actual = classify_cp_failure(raw)
         if actual != expected:
             raise AssertionError(f"CLASSIFY_MISMATCH:{raw}:{actual}:{expected}")
-    print('{"ok":true,"suite":"baidu-check-diagnostic-classifier-v2","cases":11}')
+    print('{"ok":true,"suite":"baidu-check-diagnostic-classifier-v3","cases":11,"pid_recovery":true}')
     return 0
 
 
