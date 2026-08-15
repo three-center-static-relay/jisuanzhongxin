@@ -3,6 +3,7 @@
   "name": "compute-worker",
   "main": "src/production-entry-baidu-j-v1steps.js",
   "compatibility_date": "2026-08-14",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "build": {"command": "node tests/predeploy.mjs && node tests/predeploy-circleci.mjs && node tests/model-library.mjs && node tests/universal-model-library.mjs && node tests/industry-specialist-recipes.mjs && node tests/kaggle-package-audit.mjs && node tests/medical-imaging-toolkit.mjs && node tests/benchmark-library.mjs"},
   "durable_objects": {"bindings": [{"name": "CENTER_GATE", "class_name": "CenterGate"}]},
