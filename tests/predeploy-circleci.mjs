@@ -27,16 +27,28 @@ assert.match(digest,/^[a-f0-9]{64}$/);
 const config=fs.readFileSync(new URL("../.circleci/config.yml",import.meta.url),"utf8");
 const bridge=fs.readFileSync(new URL("../bridge/baidu/bridge.py",import.meta.url),"utf8");
 const job=fs.readFileSync(new URL("../bridge/baidu/job/run.py",import.meta.url),"utf8");
+const router=fs.readFileSync(new URL("../src/baidu-circleci-router.js",import.meta.url),"utf8");
 assert.match(config,/bridge_dispatch:/);
 assert.match(config,/default: false/);
 assert.match(config,/bridge_ticket:/);
 assert.match(config,/BRIDGE_TICKET:/);
 assert.match(config,/aistudio-sdk==0\.3\.8/);
+assert.match(config,/when: always/);
 assert.match(bridge,/x-three-center-bridge-ticket/);
 assert.doesNotMatch(bridge,/BAIDU_BRIDGE_SHARED_SECRET/);
 assert.match(bridge,/"--payment", "coupon"/);
 assert.doesNotMatch(bridge,/--payment.*acoin/);
+assert.doesNotMatch(bridge,/"--env"/);
+assert.match(bridge,/AISTUDIO_AUTH_CLI/);
+assert.match(bridge,/AISTUDIO_SUBMIT_CLI/);
+assert.match(bridge,/aistudio_submit_returned/);
+assert.match(bridge,/baidu_submitted/);
+assert.match(bridge,/--selftest-parser/);
+assert.match(bridge,/ast\.literal_eval/);
+assert.match(bridge,/pipelineId/);
 assert.match(bridge,/shell=False/);
+assert.match(router,/failure_class/);
+assert.match(router,/bridge_stage/);
 assert.match(job,/\/home\/aistudio\/output\/three-center-result\.json/);
 assert.match(job,/paddle\.set_device\("gpu:0"\)/);
 
@@ -56,4 +68,4 @@ try{
   assert.equal(JSON.stringify(seen).includes("BAIDU_BRIDGE_SHARED_SECRET"),false);
 }finally{globalThis.fetch=oldFetch}
 
-console.log(JSON.stringify({ok:true,suite:"predeploy-circleci",fail_closed:true,coupon_only:true,fixed_v100:true,ephemeral_ticket:true,static_shared_secret:false,arbitrary_code:false,network:false}));
+console.log(JSON.stringify({ok:true,suite:"predeploy-circleci",fail_closed:true,coupon_only:true,fixed_v100:true,ephemeral_ticket:true,static_shared_secret:false,observable_stages:true,robust_job_id_parser:true,arbitrary_code:false,network:false}));
