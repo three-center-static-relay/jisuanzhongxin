@@ -34,6 +34,7 @@ function diagTaskId(id){const x=String(id||"");return x.startsWith("live-accept-
 async function liveDiag(req,env,ctx){
   if(Date.now()>LIVE_DIAG_EXPIRES)return err("DIAG_EXPIRED","Live acceptance route expired",410);
   const b=await req.json().catch(()=>({})),action=String(b.action||"");
+  if(action==="token_probe"){try{const who=await introspect(env);return json({ok:who.active===true,token_active:who.active===true,username_resolved:Boolean(who.username),secret_echo:false},who.active===true?200:503)}catch(e){return err(e?.message||"TOKEN_PROBE_FAILED","Kaggle token introspection failed",e?.status||503,{secret_echo:false})}}
   if(action==="cpu_start"||action==="t4_start"||action==="cancel_start"){
     const gpu=action==="t4_start",id=`live-accept-${action}-${crypto.randomUUID()}`;
     const input=gpu?{matrix_size:1024,rounds:1,seed:20260815}:action==="cancel_start"?{matrix_size:768,monte_carlo_samples:1500000,seed:20260815}:{matrix_size:256,monte_carlo_samples:250000,seed:20260815};
@@ -43,6 +44,6 @@ async function liveDiag(req,env,ctx){
   const id=diagTaskId(b.task_id);if(!id)return err("INVALID_REQUEST","valid live acceptance task_id required",400);
   if(action==="status"){const r=await status(new Request("https://compute.internal/v1/status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({task_id:id})}),env);const out=await r.json().catch(()=>null);return json(out||{ok:false},r.status)}
   if(action==="cancel"){const r=await cancel(new Request("https://compute.internal/v1/cancel",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({task_id:id})}),env);const out=await r.json().catch(()=>null);return json(out||{ok:false},r.status)}
-  return err("INVALID_REQUEST","action must be cpu_start, t4_start, cancel_start, status, or cancel",400);
+  return err("INVALID_REQUEST","action must be token_probe, cpu_start, t4_start, cancel_start, status, or cancel",400);
 }
 export default{async fetch(req,env,ctx){try{const u=new URL(req.url);if(req.method==="POST"&&u.pathname===LIVE_DIAG_PATH)return await liveDiag(req,env,ctx);if(req.method==="POST"&&INTERNAL_ONLY.has(u.pathname)&&u.hostname!=="compute.internal")return err("POLICY_DENIED","compute execution routes are service-binding internal only",403);if(req.method==="POST"&&u.pathname==="/v1/status")return await status(req,env);if(req.method==="POST"&&u.pathname==="/v1/cancel")return await cancel(req,env);if(req.method==="POST"&&u.pathname==="/v1/selftest")return await selftest(env);return await base.fetch(req,env,ctx)}catch(e){return err(e?.message||"INTERNAL_ERROR","Request failed",e?.status||500)}}};
