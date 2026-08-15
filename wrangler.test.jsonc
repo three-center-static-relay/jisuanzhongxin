@@ -9,6 +9,7 @@
     "RATE_LIMIT_PER_MIN": "200",
     "MAX_RUNTIME_SECONDS": "3600",
     "KAGGLE_MCP_BRIDGE_URL": "https://bridge.test/dispatch",
-    "KAGGLE_MCP_AUTH": "test-auth"
+    "KAGGLE_MCP_AUTH": "test-auth",
+    "KAGGLE_API_TOKEN": "test-kaggle-token"
   }
 }
