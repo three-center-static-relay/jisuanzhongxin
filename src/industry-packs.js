@@ -21,7 +21,7 @@ export const INDUSTRY_PACKS=Object.freeze({
 });
 
 export const STANDARD_WORKFLOWS=Object.freeze({
-  open_location_intelligence:{label:"开放位置情报融合",steps:["H3/空间网格预处理","WorldPop/GHSL人口与建成环境","Overture/Foursquare POI","NASA夜间活力","Dynamic World/LCFM土地利用","道路可达性","location_fusion","huff_trade_area","gravity_od","competitor_diversion"],calibration:"deferred-until-benchmark-library",observed_lbs:false},
+  open_location_intelligence:{label:"开放位置情报融合",steps:["H3/空间网格预处理","WorldPop/GHSL人口与建成环境","Overture/Foursquare POI","NASA夜间活力","Dynamic World/LCFM土地利用","道路可达性","location_fusion","huff_trade_area","gravity_od","competitor_diversion"],calibration:"benchmark-guidance-v1",observed_lbs:false},
   business_decision:{label:"商业决策",steps:["需求预测","单位经济","价格弹性","情景模拟","风险","优化","敏感性"]},
   financial_risk:{label:"金融风险",steps:["时间序列","波动率","VaR/ES","压力情景","资产配置","尾部风险"]},
   intelligence_fusion:{label:"情报研判",steps:["证据融合","竞争性假设","关系网络","异常/变点","因果根因","情景树","不确定性"]},
@@ -29,5 +29,5 @@ export const STANDARD_WORKFLOWS=Object.freeze({
   operations_optimization:{label:"运营优化",steps:["需求/容量","排队","库存","选址","路由","排程","蒙特卡洛压力"]}
 });
 
-export function industrySummary(){return{industry_pack_count:Object.keys(INDUSTRY_PACKS).length,workflow_count:Object.keys(STANDARD_WORKFLOWS).length,packs:Object.entries(INDUSTRY_PACKS).map(([id,p])=>({id,label:p.label,domains:p.domains.length,models:p.models.length})),calibration_state:"deferred-until-benchmark-library"}}
+export function industrySummary(){return{industry_pack_count:Object.keys(INDUSTRY_PACKS).length,workflow_count:Object.keys(STANDARD_WORKFLOWS).length,packs:Object.entries(INDUSTRY_PACKS).map(([id,p])=>({id,label:p.label,domains:p.domains.length,models:p.models.length})),calibration_state:"benchmark-guidance-v1-active"}}
 export function industryPack(id){const p=INDUSTRY_PACKS[id];return p?{id,...p}:null}
