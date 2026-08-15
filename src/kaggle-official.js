@@ -1,4 +1,4 @@
-import {buildModelRecipeScript,recipeMeta} from "./model-recipes.js";
+import {buildModelRecipeScript,recipeMeta} from "./model-recipe-router.js";
 const API_BASE="https://api.kaggle.com/v1";
 const MAX_JSON_BYTES=2_000_000;
 const MAX_RESULT_BYTES=65_536;
