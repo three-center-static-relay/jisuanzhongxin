@@ -27,7 +27,7 @@ try{
 
   await reset();armHold();const dupHolder=run("cx-dup","hold","core",300);await within(holdEntered,5000,"dup-enter");const dup=await within(Promise.all(Array.from({length:512},()=>run("cx-dup"))),30000,"512-duplicate");assert.equal(dup.filter(x=>x.status===409&&x.body?.error==="DUPLICATE_TASK").length,199);assert.equal(dup.filter(x=>x.status===429&&x.body?.error==="RATE_LIMITED").length,313);assert.equal(dispatchCalls,1);letGo();assert.equal((await within(dupHolder,7000,"dup-finish")).status,200);
 
-  await reset();armHold();const leaseHolder=run("cx-lease","hold","core",30);await within(holdEntered,5000,"lease-enter");await sleep(31000);const late=await run("cx-late");assert.equal(late.status,409);assert.equal(late.body?.error,"BUSY");assert.equal(dispatchCalls,1);letGo();assert.equal((await within(leaseHolder,7000,"lease-finish")).status,200);
+  await reset();const leaseHolder=await run("cx-lease","running","core",30);assert.equal(leaseHolder.status,202);await sleep(31000);const late=await run("cx-late");assert.equal(late.status,409);assert.equal(late.body?.error,"BUSY");assert.equal(dispatchCalls,1);const leaseStatus=await post("/v1/status",{task_id:"cx-lease"});assert.equal(leaseStatus.status,200);assert.equal(leaseStatus.body?.lock_released,true);assert.equal((await run("cx-after-lease-release")).status,200);
 
   await reset();const failed=await run("cx-terminal-fail","terminal-failed");assert.equal(failed.status,502);assert.equal(failed.body?.error,"UPSTREAM_TASK_FAILED");assert.equal((await run("cx-after-terminal-fail")).status,200);
   await reset();const cancelled=await run("cx-terminal-cancel","terminal-cancelled");assert.equal(cancelled.status,409);assert.equal(cancelled.body?.error,"UPSTREAM_TASK_CANCELLED");assert.equal((await run("cx-after-terminal-cancel")).status,200);
@@ -41,7 +41,7 @@ try{
   await reset();const rate=await waves(2000,128,i=>post("/v1/run",{task_id:`cx-rate-${i}`,profile:"invalid"}),"rate");assert.equal(rate.filter(x=>x.status===400&&x.body?.error==="INVALID_REQUEST").length,200);assert.equal(rate.filter(x=>x.status===429&&x.body?.error==="RATE_LIMITED").length,1800);assert.equal(dispatchCalls,0);
   const health=await waves(1024,128,()=>server.fetch("/health"),"health");assert.equal(health.filter(r=>r.status===200).length,1024);
 
-  console.log(JSON.stringify({ok:true,suite:"compute-extreme2",unique_contenders:256,unique_busy:199,unique_rate_limited:57,duplicate_contenders:512,duplicate_rejected:199,duplicate_rate_limited:313,lease_boundary_seconds:31,profiles:8,rate_total:2000,health_total:1024,tests:["256-rate-plus-lock","512-rate-plus-duplicate","31s-lease-no-overlap","terminal-failure-not-completed","terminal-cancel-not-completed","all-profiles","status-release","cancel-release","2000-overload","1024-health-burst"]}));
+  console.log(JSON.stringify({ok:true,suite:"compute-extreme2",unique_contenders:256,unique_busy:199,unique_rate_limited:57,duplicate_contenders:512,duplicate_rejected:199,duplicate_rate_limited:313,lease_boundary_seconds:31,profiles:8,rate_total:2000,health_total:1024,tests:["256-rate-plus-lock","512-rate-plus-duplicate","31s-running-lease-no-overlap","terminal-failure-not-completed","terminal-cancel-not-completed","all-profiles","status-release","cancel-release","2000-overload","1024-health-burst"]}));
 }catch(e){exitCode=1;try{server.debug()}catch{}console.error(e)}
 try{await Promise.race([server.close(),new Promise(r=>setTimeout(r,2000))])}catch{}
 network.close();clearTimeout(watchdog);process.exit(exitCode);
