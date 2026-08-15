@@ -1,7 +1,7 @@
 import {registrySummary,domainModels,MODEL_REGISTRY,PACKAGE_STACKS,allModelIds} from "./model-registry.js";
 import {runLocalModel,localModelMeta,LOCAL_MODELS} from "./local-models.js";
 import {dispatch} from "./kaggle-official.js";
-import {recipeFor,recipeMeta} from "./model-recipes.js";
+import {recipeFor,recipeMeta} from "./model-recipe-router.js";
 import {INDUSTRY_PACKS,STANDARD_WORKFLOWS,industrySummary,industryPack} from "./industry-packs.js";
 const MAX_BODY_BYTES=65536,DEFAULT_RATE=30;
 const REGISTRY_IDS=Object.freeze(allModelIds());
