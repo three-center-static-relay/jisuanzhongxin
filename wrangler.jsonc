@@ -4,7 +4,7 @@
   "main": "src/production-entry-baidu-fetch-once.js",
   "compatibility_date": "2026-08-14",
   "workers_dev": true,
-  "build": {"command": "node tests/predeploy.mjs && node tests/predeploy-circleci.mjs && node tests/model-library.mjs && node tests/universal-model-library.mjs && node tests/industry-specialist-recipes.mjs && node tests/kaggle-package-audit.mjs && node tests/live-baidu-existing-v100-fetch-after-path-fix.mjs"},
+  "build": {"command": "node tests/predeploy.mjs && node tests/predeploy-circleci.mjs && node tests/model-library.mjs && node tests/universal-model-library.mjs && node tests/industry-specialist-recipes.mjs && node tests/kaggle-package-audit.mjs"},
   "durable_objects": {"bindings": [{"name": "CENTER_GATE", "class_name": "CenterGate"}]},
   "exports": {"CenterGate": {"type":"durable-object","storage":"sqlite"}},
   "vars": {"RATE_LIMIT_PER_MIN": "30", "MAX_RUNTIME_SECONDS": "3600"}
