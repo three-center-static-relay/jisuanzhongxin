@@ -29,7 +29,7 @@ jobs:
           command: python -m pip install --disable-pip-version-check --no-input "aistudio-sdk==0.3.8"
       - run:
           name: Validate AI Studio job-id parser
-          command: python bridge/baidu/bridge_entry.py --selftest-parser
+          command: python bridge/baidu/bridge_entry2.py --selftest-parser
       - run:
           name: Run bounded Baidu CLI bridge
           when: always
@@ -39,7 +39,7 @@ jobs:
             BRIDGE_TASK_ID: << pipeline.parameters.task_id >>
             BRIDGE_BAIDU_JOB_ID: << pipeline.parameters.baidu_job_id >>
             BRIDGE_TICKET: << pipeline.parameters.bridge_ticket >>
-          command: python bridge/baidu/bridge_entry.py
+          command: python bridge/baidu/bridge_entry2.py
 
 workflows:
   baidu-cli-bridge:
