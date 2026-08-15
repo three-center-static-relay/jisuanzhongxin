@@ -29,7 +29,7 @@ def env(name, required=True):
 
 def api(method, path, body=None):
     base = env("COMPUTE_CALLBACK_URL").rstrip("/")
-    secret = env("BAIDU_BRIDGE_SHARED_SECRET")
+    ticket = env("BRIDGE_TICKET")
     data = None if body is None else json.dumps(body, separators=(",", ":")).encode()
     req = urllib.request.Request(
         base + path,
@@ -38,7 +38,7 @@ def api(method, path, body=None):
         headers={
             "accept": "application/json",
             "content-type": "application/json",
-            "x-three-center-bridge-secret": secret,
+            "x-three-center-bridge-ticket": ticket,
             "user-agent": "three-center-baidu-circleci-bridge/2026-08",
         },
     )
@@ -161,6 +161,7 @@ def one_shot(op, task_id, job_id):
 def main():
     op = env("BRIDGE_OP").upper()
     task_id = env("BRIDGE_TASK_ID")
+    env("BRIDGE_TICKET")
     job_id = env("BRIDGE_BAIDU_JOB_ID", required=False)
     if op not in ALLOWED_OPS:
         raise RuntimeError("BRIDGE_OPERATION_DENIED")
