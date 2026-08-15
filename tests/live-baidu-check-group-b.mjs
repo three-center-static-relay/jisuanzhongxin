@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
-// trigger 2026-08-15T20:51+08:00
-const BASE="https://compute-worker.a15280020511.workers.dev/__acceptance/baidu-existing-v100-20260815d";
-const CHECK=BASE+"/check";
+// read-only binary search of persisted terminal failure class; no CircleCI/Baidu dispatch
+const URL="https://compute-worker.a15280020511.workers.dev/__acceptance/baidu-existing-v100-20260815d";
 const ALLOWED=new Set(["MISSING_BAIDU_AISTUDIO_ACCESS_TOKEN","MISSING_COMPUTE_CALLBACK_URL","MISSING_BRIDGE_TICKET","CALLBACK_HTTP","BAIDU_BRIDGE_FAILED"]);
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function read(r){const text=await r.text();try{return text?JSON.parse(text):{}}catch{return{raw:text.slice(0,500)}}}
-const sr=await fetch(CHECK,{method:"POST",headers:{accept:"application/json"}});const s=await read(sr);assert.ok([200,202].includes(sr.status),`CHECK dispatch HTTP ${sr.status}: ${JSON.stringify(s)}`);assert.equal(s.ok,true);
-const deadline=Date.now()+150000;let last=null;while(Date.now()<deadline){await sleep(10000);const r=await fetch(CHECK,{headers:{accept:"application/json"}});const b=await read(r);last=b;const t=b?.task||{};console.log(JSON.stringify({status:t.status||null,failure_class:t.failure_class||null}));assert.equal(r.status,200);if(t.status==="completed"){assert.equal(t.verification_ok,true);assert.equal(t.result_digest_present,true);assert.equal(t.bridge_result_retrieved,true);process.exit(0)}if(t.status==="failed"){assert.equal(ALLOWED.has(t.failure_class),true,`diagnostic class=${t.failure_class}`);process.exit(0)}}throw new Error(`CHECK_DIAGNOSTIC_TIMEOUT:${JSON.stringify(last)}`);
+const r=await fetch(URL,{headers:{accept:"application/json"}});
+const text=await r.text();let b={};try{b=text?JSON.parse(text):{}}catch{b={raw:text.slice(0,500)}}
+const t=b?.task||{};
+console.log(JSON.stringify({http:r.status,status:t.status||null,failure_class:t.failure_class||null,verification_ok:t.verification_ok===true,result_digest_present:t.result_digest_present===true,retrieved:t.bridge_result_retrieved===true}));
+assert.equal(r.status,200,`status HTTP ${r.status}: ${JSON.stringify(b)}`);
+if(t.status==="completed"){
+  assert.equal(t.verification_ok,true);assert.equal(t.result_digest_present,true);assert.equal(t.bridge_result_retrieved,true);
+}else{
+  assert.equal(t.status,"failed",`unexpected status=${t.status}`);
+  assert.equal(ALLOWED.has(t.failure_class),true,`persisted diagnostic class=${t.failure_class}`);
+}
+console.log(JSON.stringify({ok:true,suite:"baidu-persisted-failure-group-b"}));
