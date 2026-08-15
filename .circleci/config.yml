@@ -37,17 +37,8 @@ jobs:
           name: Validate Baidu status/output diagnostic
           command: python bridge/baidu/bridge_entry4.py --selftest-diagnostic
       - run:
-          name: Validate Baidu terminal failure classifier
-          command: python bridge/baidu/bridge_entry5.py --selftest-terminal
-      - run:
-          name: Validate Baidu persisted-log classifier
-          command: python bridge/baidu/bridge_entry6.py --selftest-logdiag
-      - run:
-          name: Validate Baidu output API classifier
-          command: python bridge/baidu/bridge_entry7.py --selftest-outputapi
-      - run:
-          name: Validate Baidu output API code classifier
-          command: python bridge/baidu/bridge_entry8.py --selftest-outputcode
+          name: Validate Baidu structured runtime result
+          command: python bridge/baidu/job/run.py --selftest
       - run:
           name: Run bounded Baidu CLI bridge
           when: always
@@ -57,7 +48,7 @@ jobs:
             BRIDGE_TASK_ID: << pipeline.parameters.task_id >>
             BRIDGE_BAIDU_JOB_ID: << pipeline.parameters.baidu_job_id >>
             BRIDGE_TICKET: << pipeline.parameters.bridge_ticket >>
-          command: python bridge/baidu/bridge_entry8.py
+          command: python bridge/baidu/bridge_entry4.py
 
 workflows:
   baidu-cli-bridge:
