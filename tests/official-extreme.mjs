@@ -1,0 +1,38 @@
+import assert from "node:assert/strict";
+import {createTestHarness} from "wrangler";
+import {http,HttpResponse} from "msw";
+import {setupServer} from "msw/node";
+const watchdog=setTimeout(()=>{console.error("OFFICIAL_EXTREME_WATCHDOG");process.exit(124)},180000);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const within=(p,ms,label)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error(`TIMEOUT:${label}`)),ms))]);
+async function waves(total,width,fn,label){const out=[];for(let i=0;i<total;i+=width){out.push(...await within(Promise.all(Array.from({length:Math.min(width,total-i)},(_,j)=>fn(i+j))),20000,`${label}-${i}`))}return out}
+const api="https://api.kaggle.com/v1";let saveCalls=0,statusMode="COMPLETE",mcpCalls=0;const jobs=new Map();
+function meta(text){const a=text.match(/"task_id":("(?:[^"\\]|\\.)*")/),b=text.match(/"profile":("(?:[^"\\]|\\.)*")/);return{task_id:a?JSON.parse(a[1]):"x",profile:b?JSON.parse(b[1]):"core"}}
+const network=setupServer(
+ http.post(`${api}/security.OAuthService/IntrospectToken`,()=>HttpResponse.json({active:true,username:"tester",userId:1,scope:"read write"})),
+ http.post(`${api}/kernels.KernelsApiService/SaveKernel`,async({request})=>{saveCalls++;const b=await request.json(),m=meta(b.text);assert.equal(b.isPrivate,true);assert.equal(b.enableInternet,false);assert.ok(!b.text.includes("EVIL_USER_CODE"));jobs.set(b.slug,{...m,gpu:b.machineShape==="NvidiaTeslaT4"});return HttpResponse.json({ref:b.slug,versionNumber:1})}),
+ http.post(`${api}/kernels.KernelsApiService/GetKernelSessionStatus`,()=>HttpResponse.json({status:statusMode,failureMessage:statusMode==="ERROR"?"synthetic":""})),
+ http.post(`${api}/kernels.KernelsApiService/ListKernelSessionOutput`,async({request})=>{const b=await request.json(),j=jobs.get(`${b.userName}/${b.kernelSlug}`)||{task_id:"x",profile:"core",gpu:false};const result=j.gpu?{ok:true,task_id:j.task_id,profile:j.profile,accelerator:"t4",cuda:true,device:"NVIDIA Tesla T4",relative_error:0.002}:{ok:true,task_id:j.task_id,profile:j.profile,accelerator:"cpu",pi:3.14159,linear_residual:1e-12};return HttpResponse.json({files:[],log:`THREE_CENTER_RESULT:${JSON.stringify(result)}\n`})}),
+ http.post(`${api}/kernels.KernelsApiService/DeleteKernel`,()=>HttpResponse.json({errorMessage:""})),
+ http.post("https://www.kaggle.com/mcp",async({request})=>{const b=await request.json();if(b.method==="initialize")return HttpResponse.json({jsonrpc:"2.0",id:b.id,result:{protocolVersion:"2025-06-18",capabilities:{tools:{}},serverInfo:{name:"Kaggle.Web",version:"1"}}},{headers:{"mcp-session-id":"s"}});if(b.method==="notifications/initialized")return new HttpResponse(null,{status:202});if(b.method==="tools/list")return HttpResponse.json({jsonrpc:"2.0",id:b.id,result:{tools:[{name:"kernel_session_cancel",description:"Cancel notebook kernel session",inputSchema:{type:"object",properties:{user_name:{type:"string"},kernel_slug:{type:"string"}},required:["user_name","kernel_slug"]}}]}});if(b.method==="tools/call"){mcpCalls++;statusMode="CANCEL_ACKNOWLEDGED";return HttpResponse.json({jsonrpc:"2.0",id:b.id,result:{content:[{type:"text",text:"cancelled"}],isError:false}})}return HttpResponse.json({jsonrpc:"2.0",id:b.id,error:{code:-32601,message:"unknown"}})} )
+);
+network.listen({onUnhandledRequest:"error"});
+const server=createTestHarness({workers:[{configPath:"./wrangler.test.jsonc"}]});
+const internal=p=>`https://compute.internal${p}`,external=p=>`https://public.example${p}`;
+async function post(path,b){const r=await server.fetch(internal(path),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)});return{status:r.status,body:await r.json().catch(()=>null)}}
+async function run(id,profile="core",extra={}){return post("/v1/run",{task_id:id,profile,timeout_seconds:60,input:{code:"EVIL_USER_CODE",...(extra.input||{})},...extra})}
+async function reset(){await within(server.reset(),10000,"reset");saveCalls=0;statusMode="COMPLETE";mcpCalls=0;jobs.clear()}
+let code=0;
+try{
+ await within(server.listen(),15000,"listen");
+ await reset();const holder=await run("ex-holder");assert.equal(holder.status,202);statusMode="RUNNING";const unique=await within(Promise.all(Array.from({length:256},(_,i)=>run(`ex-u-${i}`))),45000,"256-unique");assert.equal(unique.filter(x=>x.status===409&&x.body?.error==="BUSY").length,199);assert.equal(unique.filter(x=>x.status===429&&x.body?.error==="RATE_LIMITED").length,57);assert.equal(saveCalls,1);statusMode="COMPLETE";assert.equal((await post("/v1/status",{task_id:"ex-holder"})).status,200);
+ await reset();const dupHolder=await run("ex-dup");assert.equal(dupHolder.status,202);const dup=await within(Promise.all(Array.from({length:512},()=>run("ex-dup"))),60000,"512-dup");assert.equal(dup.filter(x=>x.status===409&&x.body?.error==="DUPLICATE_TASK").length,199);assert.equal(dup.filter(x=>x.status===429&&x.body?.error==="RATE_LIMITED").length,313);assert.equal(saveCalls,1);assert.equal((await post("/v1/status",{task_id:"ex-dup"})).status,200);
+ await reset();const lease=await run("ex-lease","core",{timeout_seconds:60});assert.equal(lease.status,202);statusMode="RUNNING";await sleep(31000);const late=await run("ex-late");assert.equal(late.status,409);assert.equal(late.body.error,"BUSY");assert.equal(saveCalls,1);statusMode="COMPLETE";assert.equal((await post("/v1/status",{task_id:"ex-lease"})).status,200);
+ await reset();for(const profile of ["core","bayesian","simulation","causal","finance","gis","gpu","optimization"]){const gpu=profile==="gpu",r=await run(`ex-${profile}`,profile,{gpu,input:gpu?{matrix_size:1024,rounds:1}:{matrix_size:128,monte_carlo_samples:100000}});assert.equal(r.status,202);const s=await post("/v1/status",{task_id:`ex-${profile}`});assert.equal(s.status,200);assert.equal(s.body.verification.ok,true);assert.equal(s.body.result.accelerator,gpu?"t4":"cpu")}
+ await reset();statusMode="ERROR";assert.equal((await run("ex-fail")).status,202);const fail=await post("/v1/status",{task_id:"ex-fail"});assert.equal(fail.status,502);assert.equal(fail.body.error,"UPSTREAM_TASK_FAILED");assert.equal((await run("ex-after-fail")).status,202);
+ await reset();statusMode="RUNNING";assert.equal((await run("ex-cancel")).status,202);const c=await post("/v1/cancel",{task_id:"ex-cancel"});assert.equal(c.status,202);assert.equal(c.body.lock_retained,true);assert.equal(mcpCalls,1);const cs=await post("/v1/status",{task_id:"ex-cancel"});assert.equal(cs.status,200);assert.equal(cs.body.status,"cancelled");assert.equal((await run("ex-after-cancel")).status,202);
+ await reset();const rate=await waves(2000,128,i=>post("/v1/run",{task_id:`ex-rate-${i}`,profile:"invalid"}),"rate");assert.equal(rate.filter(x=>x.status===400&&x.body?.error==="INVALID_REQUEST").length,200);assert.equal(rate.filter(x=>x.status===429&&x.body?.error==="RATE_LIMITED").length,1800);assert.equal(saveCalls,0);
+ const health=await waves(1024,128,()=>server.fetch(external("/health")),"health");assert.equal(health.filter(r=>r.status===200).length,1024);
+ console.log(JSON.stringify({ok:true,suite:"official-extreme",unique_contenders:256,duplicate_contenders:512,lease_boundary_seconds:31,profiles:8,rate_total:2000,health_total:1024,tests:["256-single-lock","512-duplicate","31s-lock-boundary","8-profiles-cpu-t4","failure-release","mcp-cancel-release","2000-rate-limit","1024-health-burst","arbitrary-code-injection-ignored"]}));
+}catch(e){code=1;try{server.debug()}catch{}console.error(e)}
+try{await server.close()}catch{}network.close();clearTimeout(watchdog);process.exit(code);
