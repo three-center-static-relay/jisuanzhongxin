@@ -5,8 +5,6 @@ import {probeEarthEngine,stressEarthEngine} from "./google-ee.js";
 export {CenterGate};
 
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
-const GOOGLE_EE_DIAG_PATH="/__diag/google-ee-6fe38386-0a93-4f7c-98c2-b8e2be663b55";
-const GOOGLE_EE_DIAG_EXPIRES=Date.parse("2026-08-15T05:30:00Z");
 let openEOHealth={at:0,value:null};
 let baiduHealth={at:0,value:null};
 let googleEEHealth={at:0,value:null};
@@ -24,6 +22,5 @@ export default {async fetch(req,env,ctx){const u=new URL(req.url);
   if(req.method==="GET"&&u.pathname==="/v1/providers/google-ee/meta")return json({ok:true,provider:"google-earth-engine",automation_mode:"service-account-rest",arbitrary_code:false,service_binding_selftest:true,secret_echo:false});
   if(req.method==="GET"&&u.pathname==="/v1/providers/google-ee/health"){const p=await googleEEProbe(env);return json(p,p.ok?200:503)}
   if(req.method==="POST"&&u.pathname==="/v1/providers/google-ee/selftest"){if(u.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"Google Earth Engine selftest is service-binding internal only"},403);const r=await googleEESelftest(env);return json(r.body,r.status)}
-  if(req.method==="POST"&&u.pathname===GOOGLE_EE_DIAG_PATH){if(Date.now()>GOOGLE_EE_DIAG_EXPIRES)return json({ok:false,error:"DIAG_EXPIRED"},410);const r=await googleEESelftest(env);return json(r.body,r.status)}
   return guard.fetch(req,env,ctx);
 }};
