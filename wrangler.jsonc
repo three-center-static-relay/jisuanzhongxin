@@ -4,7 +4,6 @@
   "main": "src/production.js",
   "compatibility_date": "2026-08-14",
   "workers_dev": true,
-  "build": {"command": "node tests/live-google-ee-deep.mjs"},
   "durable_objects": {"bindings": [{"name": "CENTER_GATE", "class_name": "CenterGate"}]},
   "exports": {"CenterGate": {"type":"durable-object","storage":"sqlite"}},
   "vars": {"RATE_LIMIT_PER_MIN": "30", "MAX_RUNTIME_SECONDS": "3600"}
