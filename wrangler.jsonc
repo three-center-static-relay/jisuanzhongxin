@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "compute-worker",
-  "main": "src/production-entry-fetch.js",
+  "main": "src/production-entry.js",
   "compatibility_date": "2026-08-14",
   "workers_dev": true,
   "build": {"command": "node tests/predeploy.mjs && node tests/predeploy-circleci.mjs"},
