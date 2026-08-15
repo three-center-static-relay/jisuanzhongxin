@@ -12,8 +12,6 @@ TARGET_RESULT = "three-center-result.json"
 
 
 def _fail(task_id, stored_job_id, failure_class):
-    # Keep callbacks tied to the legacy stored id. A recovered real pipeline id
-    # is used only inside CircleCI so Cloudflare's mismatch guard remains intact.
     impl.callback(
         task_id,
         "CHECK",
@@ -57,12 +55,17 @@ def _select_pipeline_row(rows, expected_name):
     exact = [x for x in (rows or []) if str(x.get("pipelineName") or "").strip() == expected_name]
     if not exact:
         return None
-    # The deterministic name should normally be unique. If a historical retry
-    # exists, newest createTime is the safest bounded choice.
     exact.sort(key=lambda x: str(x.get("createTime") or ""), reverse=True)
     row = exact[0]
     pid = str(row.get("pipelineId") or "").strip()
     return row if pid else None
+
+
+def _query_rows(pp_request, token, name):
+    resp = pp_request.query(token, "", name, "")
+    if not isinstance(resp, dict) or int(resp.get("errorCode", -1)) != 0:
+        return None
+    return resp.get("result") or []
 
 
 def _resolve_pipeline_by_name(token, task_id):
@@ -71,20 +74,25 @@ def _resolve_pipeline_by_name(token, task_id):
         return {"ok": False, "failure_class": "BAIDU_PIPELINE_NAME_INVALID"}
     try:
         from aistudio_sdk.requests import pipeline as pp_request
-        resp = pp_request.query(token, "", expected_name, "")
+        # First use the documented name filter.
+        rows = _query_rows(pp_request, token, expected_name)
+        if rows is None:
+            return {"ok": False, "failure_class": "BAIDU_PIPELINE_RECOVERY_API_ERROR"}
+        row = _select_pipeline_row(rows, expected_name)
+        if not row:
+            # Zero-GPU fallback: query the visible pipeline list without a name
+            # filter and perform the exact match locally. This distinguishes a
+            # broken server-side name filter from a genuinely absent submit.
+            all_rows = _query_rows(pp_request, token, "")
+            if all_rows is None:
+                return {"ok": False, "failure_class": "BAIDU_PIPELINE_GLOBAL_QUERY_API_ERROR"}
+            row = _select_pipeline_row(all_rows, expected_name)
     except Exception:
         return {"ok": False, "failure_class": "BAIDU_PIPELINE_RECOVERY_REQUEST_FAILED"}
-    if not isinstance(resp, dict) or int(resp.get("errorCode", -1)) != 0:
-        return {"ok": False, "failure_class": "BAIDU_PIPELINE_RECOVERY_API_ERROR"}
-    row = _select_pipeline_row(resp.get("result") or [], expected_name)
     if not row:
-        return {"ok": False, "failure_class": "BAIDU_PIPELINE_RECOVERY_NOT_FOUND"}
+        return {"ok": False, "failure_class": "BAIDU_PIPELINE_ABSENT_AFTER_GLOBAL_QUERY"}
     pid = str(row.get("pipelineId") or "").strip()
-    return {
-        "ok": True,
-        "pipeline_id": pid,
-        "category": _stage_category(row.get("stage")),
-    }
+    return {"ok": True, "pipeline_id": pid, "category": _stage_category(row.get("stage"))}
 
 
 def _list_output(token, pipeline_id):
@@ -156,8 +164,6 @@ def diagnostic_check(task_id, stored_job_id):
         return _fail(task_id, stored_job_id, "BAIDU_RESULT_LISTED_BUT_DOWNLOAD_FAILED")
 
     if recovered:
-        # Omit corrected pipeline id from callback. Router will retain the stored
-        # legacy id while validating the real V100 result and digest.
         impl.callback(task_id, "FETCH", "completed", result=result, stage="result_retrieved")
     else:
         impl.callback(task_id, "FETCH", "completed", baidu_job_id=stored_job_id, result=result, stage="result_retrieved")
@@ -188,7 +194,7 @@ def selftest():
     picked = _select_pipeline_row(rows, name)
     if not picked or str(picked.get("pipelineId")) != "333":
         raise AssertionError("PIPELINE_NAME_RECOVERY_SELECTION_FAILED")
-    print(json.dumps({"ok": True, "suite": "baidu-status-output-diagnostic-v2", "cases": len(cases) + 1, "pid_recovery": True}))
+    print(json.dumps({"ok": True, "suite": "baidu-status-output-diagnostic-v3", "cases": len(cases) + 1, "global_lookup": True}))
     return 0
 
 
