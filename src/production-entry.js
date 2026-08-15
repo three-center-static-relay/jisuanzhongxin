@@ -22,7 +22,7 @@ export default {
     const u=new URL(req.url);
     if(req.method==="GET"&&u.pathname==="/v1/toolkits/medical-imaging/meta")return Response.json({ok:true,...medicalImagingMeta(),request_profile:"medical-imaging",gpu_optional:true},{headers:{"cache-control":"no-store"}});
     if(req.method==="GET"&&u.pathname==="/v1/providers/modal/meta")return Response.json({ok:true,...modalMeta(),secret_echo:false},{headers:{"cache-control":"no-store"}});
-    if(req.method==="GET"&&u.pathname==="/v1/providers/modal/health"){const p=modalHealth(env);return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}})}
+    if(req.method==="GET"&&u.pathname==="/v1/providers/modal/health"){const p=await modalHealth(env);return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}})}
     req=await normalizeMedicalImagingRequest(req);
     const benchmarkHandled=await maybeHandleBenchmarks(req);
     if(benchmarkHandled)return benchmarkHandled;
