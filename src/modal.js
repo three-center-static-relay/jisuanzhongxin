@@ -41,8 +41,10 @@ export async function modalHealth(env){
   const proxySecret=String(env.MODAL_PROXY_TOKEN_SECRET||"").trim();
   const apiPairConfigured=Boolean(apiId&&apiSecret);
   const bridgeConfigured=Boolean(endpoint&&proxyId&&proxySecret);
+  const modalBindingNames=Object.keys(env||{}).filter((k)=>String(k).startsWith("MODAL_")).sort();
   const base={
     provider:PROVIDER,
+    modal_binding_names:modalBindingNames,
     api_token_pair_configured:apiPairConfigured,
     api_token_id_format_ok:apiId?(/^ak-[A-Za-z0-9_-]+$/.test(apiId)):false,
     api_token_secret_format_ok:apiSecret?(/^as-[A-Za-z0-9_-]+$/.test(apiSecret)):false,
