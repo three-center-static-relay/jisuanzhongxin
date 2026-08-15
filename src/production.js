@@ -1,5 +1,6 @@
 import guard,{CenterGate} from "./guard.js";
 import {probeOpenEO,openEOMeta} from "./openeo.js";
+import {probeBaiduAIStudio,baiduAIStudioMeta} from "./baidu-aistudio.js";
 export {CenterGate};
 
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
@@ -38,6 +39,11 @@ export default {
     if(req.method==="GET"&&u.pathname==="/v1/providers/openeo/health"){
       const p=await openEOProbe(env);
       return json(p,p.ok?200:503);
+    }
+    if(req.method==="GET"&&u.pathname==="/v1/providers/baidu/meta")return json({ok:true,...baiduAIStudioMeta(),secret_echo:false});
+    if(req.method==="GET"&&u.pathname==="/v1/providers/baidu/health"){
+      const p=probeBaiduAIStudio(env);
+      return json(p,p.automation_ready?200:503);
     }
     return guard.fetch(req,env,ctx);
   }
