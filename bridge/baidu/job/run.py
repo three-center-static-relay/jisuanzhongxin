@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import json
 import os
@@ -13,16 +14,18 @@ def clamp(value, low, high, default):
         return default
 
 
-def classify_exception(exc):
+def classify_exception(exc, stage=""):
     msg = str(exc or "").lower()
     name = exc.__class__.__name__.lower() if exc is not None else ""
+    if stage == "load_task_manifest":
+        return "BAIDU_RUNTIME_TASK_MANIFEST_ERROR"
     if isinstance(exc, TimeoutError) or "task_timeout" in msg or "timed out" in msg or "timeout" in msg:
         return "BAIDU_RUNTIME_TIMEOUT"
     if isinstance(exc, (ImportError, ModuleNotFoundError)) or "no module named" in msg or "importerror" in msg:
         return "BAIDU_RUNTIME_DEPENDENCY_ERROR"
     if isinstance(exc, MemoryError) or "out of memory" in msg or "cuda oom" in msg:
         return "BAIDU_RUNTIME_OOM"
-    if "v100_gpu_not_available" in msg or "gpu not available" in msg or "gpu:0" in msg and "not" in msg:
+    if "v100_gpu_not_available" in msg or "gpu not available" in msg or ("gpu:0" in msg and "not" in msg):
         return "BAIDU_RUNTIME_GPU_UNAVAILABLE"
     if "cuda" in msg or "cudnn" in msg:
         return "BAIDU_RUNTIME_CUDA_ERROR"
@@ -40,42 +43,66 @@ def write_result(result):
     print("THREE_CENTER_RESULT:" + json.dumps(result, sort_keys=True), flush=True)
 
 
+def parse_args(argv=None):
+    p = argparse.ArgumentParser(add_help=False)
+    p.add_argument("--task-id", default="")
+    p.add_argument("--profile", default="gpu")
+    return p.parse_known_args(argv)[0]
+
+
 def selftest():
     cases = [
-        (ModuleNotFoundError("No module named paddle"), "BAIDU_RUNTIME_DEPENDENCY_ERROR"),
-        (TimeoutError("TASK_TIMEOUT"), "BAIDU_RUNTIME_TIMEOUT"),
-        (MemoryError("out of memory"), "BAIDU_RUNTIME_OOM"),
-        (RuntimeError("V100_GPU_NOT_AVAILABLE"), "BAIDU_RUNTIME_GPU_UNAVAILABLE"),
-        (RuntimeError("CUDA initialization failed"), "BAIDU_RUNTIME_CUDA_ERROR"),
-        (RuntimeError("unexpected"), "BAIDU_RUNTIME_EXECUTION_ERROR"),
+        (ModuleNotFoundError("No module named paddle"), "import_paddle", "BAIDU_RUNTIME_DEPENDENCY_ERROR"),
+        (TimeoutError("TASK_TIMEOUT"), "matmul", "BAIDU_RUNTIME_TIMEOUT"),
+        (MemoryError("out of memory"), "matmul", "BAIDU_RUNTIME_OOM"),
+        (RuntimeError("V100_GPU_NOT_AVAILABLE"), "select_gpu", "BAIDU_RUNTIME_GPU_UNAVAILABLE"),
+        (RuntimeError("CUDA initialization failed"), "select_gpu", "BAIDU_RUNTIME_CUDA_ERROR"),
+        (FileNotFoundError("task.json"), "load_task_manifest", "BAIDU_RUNTIME_TASK_MANIFEST_ERROR"),
+        (RuntimeError("unexpected"), "matmul", "BAIDU_RUNTIME_EXECUTION_ERROR"),
     ]
-    for exc, expected in cases:
-        actual = classify_exception(exc)
+    for exc, stage, expected in cases:
+        actual = classify_exception(exc, stage)
         if actual != expected:
             raise AssertionError(f"RUNTIME_CLASS_MISMATCH:{actual}:{expected}")
-    print(json.dumps({"ok": True, "suite": "baidu-structured-runtime-failure", "cases": len(cases)}))
+    args = parse_args(["--task-id", "baidu-circleci-live-20260815i", "--profile", "gpu"])
+    if args.task_id != "baidu-circleci-live-20260815i" or args.profile != "gpu":
+        raise AssertionError("RUNTIME_BOOTSTRAP_ARGS_FAILED")
+    print(json.dumps({"ok": True, "suite": "baidu-structured-runtime-bootstrap", "cases": len(cases) + 1}))
     return 0
 
 
-def main():
-    with open("task.json", "r", encoding="utf-8") as f:
-        task = json.load(f)
-    task_id = str(task["task_id"])
-    profile = str(task.get("profile") or "gpu")
-    timeout_seconds = clamp(task.get("timeout_seconds"), 60, 900, 300)
-    data = task.get("input") or {}
-    matrix = clamp(data.get("matrix_size"), 256, 2048, 1024)
-    rounds = clamp(data.get("rounds"), 1, 5, 2)
-    seed = clamp(data.get("seed"), 1, 2147483647, 20260815)
-    stage = "runtime_init"
+def main(argv=None):
+    args = parse_args(argv)
+    task_id = str(args.task_id or "").strip()
+    profile = str(args.profile or "gpu").strip() or "gpu"
+    stage = "bootstrap"
     t0 = time.time()
+    timeout_seconds = 300
+    matrix = 1024
+    rounds = 2
+    seed = 20260815
 
     def timed_out(_signum, _frame):
         raise TimeoutError("TASK_TIMEOUT")
 
-    signal.signal(signal.SIGALRM, timed_out)
-    signal.alarm(timeout_seconds)
     try:
+        if not task_id:
+            raise RuntimeError("TASK_ID_BOOTSTRAP_MISSING")
+        stage = "load_task_manifest"
+        with open("/home/aistudio/task.json", "r", encoding="utf-8") as f:
+            task = json.load(f)
+        if str(task.get("task_id") or "") != task_id:
+            raise RuntimeError("TASK_ID_MANIFEST_MISMATCH")
+        profile = str(task.get("profile") or profile)
+        timeout_seconds = clamp(task.get("timeout_seconds"), 60, 900, 300)
+        data = task.get("input") or {}
+        matrix = clamp(data.get("matrix_size"), 256, 2048, 1024)
+        rounds = clamp(data.get("rounds"), 1, 5, 2)
+        seed = clamp(data.get("seed"), 1, 2147483647, 20260815)
+
+        stage = "install_timeout_guard"
+        signal.signal(signal.SIGALRM, timed_out)
+        signal.alarm(timeout_seconds)
         stage = "import_paddle"
         import paddle
         stage = "seed"
@@ -109,19 +136,22 @@ def main():
     except Exception as exc:
         result = {
             "ok": False,
-            "task_id": task_id,
+            "task_id": task_id or "bootstrap-missing",
             "profile": profile,
-            "failure_class": classify_exception(exc),
+            "failure_class": classify_exception(exc, stage),
             "failure_stage": stage,
             "elapsed_s": time.time() - t0,
         }
         write_result(result)
     finally:
-        signal.alarm(0)
+        try:
+            signal.alarm(0)
+        except Exception:
+            pass
     return 0
 
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--selftest":
         sys.exit(selftest())
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
