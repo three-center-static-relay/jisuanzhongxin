@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+// trigger 2026-08-15T20:51+08:00
 const BASE="https://compute-worker.a15280020511.workers.dev/__acceptance/baidu-existing-v100-20260815d";
 const CHECK=BASE+"/check";
 const ALLOWED=new Set(["MISSING_BAIDU_AISTUDIO_ACCESS_TOKEN","MISSING_COMPUTE_CALLBACK_URL","MISSING_BRIDGE_TICKET","CALLBACK_HTTP","BAIDU_BRIDGE_FAILED"]);
