@@ -3,8 +3,8 @@ import {maybeHandleBaiduCircleCI} from "./baidu-circleci-router.js";
 import {baiduCircleCIMeta,digestBridgeTicket,newBridgeTicket,normalizeBaiduInput,triggerBaiduBridge} from "./baidu-circleci.js";
 export {CenterGate};
 
-const DIAG_PATH="/__diag/baidu-circleci-live-20260815-b9e2d4";
-const DIAG_TASK_ID="baidu-circleci-live-20260815b";
+const DIAG_PATH="/__diag/baidu-circleci-live-20260815-c4f1a8";
+const DIAG_TASK_ID="baidu-circleci-live-20260815c";
 const DIAG_EXPIRES_AT_MS=Date.parse("2026-08-16T00:00:00Z");
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
 const now=()=>new Date().toISOString();
