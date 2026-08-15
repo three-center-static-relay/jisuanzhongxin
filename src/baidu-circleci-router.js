@@ -1,4 +1,4 @@
-import {baiduCircleCIMeta,bridgeAuthorized,normalizeBaiduInput,triggerBaiduBridge} from "./baidu-circleci.js";
+import {baiduCircleCIMeta,digestBridgeTicket,newBridgeTicket,normalizeBaiduInput,triggerBaiduBridge} from "./baidu-circleci.js";
 
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
 const err=(c,m,s=400,d)=>json({ok:false,error:c,message:m,...(d?{details:d}:{})},s);
@@ -16,6 +16,14 @@ async function sha256(v){const h=await crypto.subtle.digest("SHA-256",new TextEn
 async function body(req){const text=await req.text();if(new TextEncoder().encode(text).length>65536)throw Object.assign(new Error("BODY_TOO_LARGE"),{status:413});try{return text?JSON.parse(text):{}}catch{throw Object.assign(new Error("INVALID_REQUEST"),{status:400})}}
 function accepted(env){const m=baiduCircleCIMeta(env);return m.configured&&m.e2e_verified}
 function validResult(task,r){if(!r||r.ok!==true||String(r.task_id)!==String(task.task_id)||String(r.profile)!==String(task.profile))return{ok:false,reason:"RESULT_IDENTITY_MISMATCH"};if(r.accelerator!=="v100"||r.cuda!==true||!/gpu/i.test(String(r.device||"")))return{ok:false,reason:"V100_VERIFICATION_FAILED"};if(!/^[a-f0-9]{64}$/i.test(String(r.matrix_checksum||"")))return{ok:false,reason:"RESULT_CHECKSUM_INVALID"};return{ok:true}}
+async function ticketAuthorized(req,task){
+  const ticket=String(req.headers.get("x-three-center-bridge-ticket")||"").trim();
+  if(!ticket||!task?.bridge_ticket_digest||Number(task.bridge_ticket_expires_at_ms||0)<Date.now())return false;
+  const actual=await digestBridgeTicket(ticket),expected=String(task.bridge_ticket_digest);
+  if(actual.length!==expected.length)return false;
+  let diff=0;for(let i=0;i<expected.length;i++)diff|=expected.charCodeAt(i)^actual.charCodeAt(i);
+  return diff===0;
+}
 
 async function start(req,env){
   if(new URL(req.url).hostname!=="compute.internal")return err("POLICY_DENIED","Baidu execution is service-binding internal only",403);
@@ -26,29 +34,30 @@ async function start(req,env){
   const old=await load(env,id);if(old.task)return err("DUPLICATE_TASK","task_id already exists",409,{task_id:id,status:old.task.status});
   const timeout=Math.max(60,Math.min(900,int(b.timeout_seconds,300))),lock=await acquire(env,id,timeout+240);if(!lock.ok)return err("BUSY","Another compute task is active",409,lock.active);
   try{
+    const ticket=newBridgeTicket(),ticketDigest=await digestBridgeTicket(ticket),ticketExpiresAt=Date.now()+Math.min(1800,(timeout+300))*1000;
     const manifest={task_id:id,profile,input:normalizeBaiduInput(b.input||{}),timeout_seconds:timeout};
-    await save(env,id,{status:"bridge_dispatching",profile,executor:"baidu-circleci-cli",gpu:true,manifest,created_at:now(),cancel_requested:false});
-    const out=await triggerBaiduBridge(env,{op:"SUBMIT",task_id:id});
+    await save(env,id,{status:"bridge_dispatching",profile,executor:"baidu-circleci-cli",gpu:true,manifest,created_at:now(),cancel_requested:false,bridge_ticket_digest:ticketDigest,bridge_ticket_expires_at_ms:ticketExpiresAt});
+    const out=await triggerBaiduBridge(env,{op:"SUBMIT",task_id:id,bridge_ticket:ticket});
     await save(env,id,{status:"bridge_submitted",circleci_pipeline_id:out.pipeline_id,circleci_pipeline_number:out.pipeline_number,bridge_started_at:now()});
     return json({ok:true,task_id:id,status:"bridge_submitted",executor:"baidu-circleci-cli",circleci_pipeline_id:out.pipeline_id},202);
-  }catch(e){await save(env,id,{status:"failed",error:String(e?.message||e),finished_at:now()});await release(env,id);return err(e?.message||"BAIDU_BRIDGE_DISPATCH_FAILED","CircleCI bridge dispatch failed",e?.status||502,{task_id:id})}
+  }catch(e){await save(env,id,{status:"failed",error:String(e?.message||e),bridge_ticket_digest:null,finished_at:now()});await release(env,id);return err(e?.message||"BAIDU_BRIDGE_DISPATCH_FAILED","CircleCI bridge dispatch failed",e?.status||502,{task_id:id})}
 }
 
 async function manifest(req,env,id){
-  if(!bridgeAuthorized(req,env))return err("UNAUTHORIZED","Bridge authentication failed",401);
   const t=(await load(env,id)).task;if(!t||t.executor!=="baidu-circleci-cli")return err("TASK_NOT_FOUND","Task not found",404);
+  if(!await ticketAuthorized(req,t))return err("UNAUTHORIZED","Bridge ticket invalid or expired",401);
   return json({ok:true,...t.manifest});
 }
 async function control(req,env,id){
-  if(!bridgeAuthorized(req,env))return err("UNAUTHORIZED","Bridge authentication failed",401);
   const t=(await load(env,id)).task;if(!t||t.executor!=="baidu-circleci-cli")return err("TASK_NOT_FOUND","Task not found",404);
+  if(!await ticketAuthorized(req,t))return err("UNAUTHORIZED","Bridge ticket invalid or expired",401);
   return json({ok:true,task_id:id,cancel_requested:t.cancel_requested===true,timeout_seconds:t.manifest?.timeout_seconds||300,status:t.status});
 }
 async function callback(req,env){
-  if(!bridgeAuthorized(req,env))return err("UNAUTHORIZED","Bridge authentication failed",401);
   const b=await body(req),id=String(b.task_id||""),op=String(b.op||"").toUpperCase(),status=String(b.status||"").toLowerCase();
   if(!id||!["SUBMIT","CHECK","FETCH","CANCEL"].includes(op))return err("INVALID_REQUEST","Invalid bridge callback",400);
   const t=(await load(env,id)).task;if(!t||t.executor!=="baidu-circleci-cli")return err("TASK_NOT_FOUND","Task not found",404);
+  if(!await ticketAuthorized(req,t))return err("UNAUTHORIZED","Bridge ticket invalid or expired",401);
   const job=String(b.baidu_job_id||t.baidu_job_id||"");
   if(t.baidu_job_id&&job&&String(t.baidu_job_id)!==job)return err("JOB_ID_MISMATCH","Baidu job identity mismatch",409);
   if(status==="running"||status==="cancel_requested"){
@@ -56,14 +65,14 @@ async function callback(req,env){
     return json({ok:true,task_id:id,status:status==="cancel_requested"?"cancel_requested":"running"});
   }
   if(status==="completed"){
-    const verification=validResult(t,b.result);if(!verification.ok){await save(env,id,{status:"failed",error:verification.reason,verification,finished_at:now()});await release(env,id);return err("UPSTREAM_TASK_FAILED",verification.reason,502,{task_id:id})}
-    const digest=await sha256(JSON.stringify(b.result));await save(env,id,{status:"completed",baidu_job_id:job||null,result:b.result,result_digest:digest,verification,finished_at:now(),bridge_result_retrieved:true});await release(env,id);return json({ok:true,task_id:id,status:"completed",result_digest:digest,verification});
+    const verification=validResult(t,b.result);if(!verification.ok){await save(env,id,{status:"failed",error:verification.reason,verification,bridge_ticket_digest:null,finished_at:now()});await release(env,id);return err("UPSTREAM_TASK_FAILED",verification.reason,502,{task_id:id})}
+    const digest=await sha256(JSON.stringify(b.result));await save(env,id,{status:"completed",baidu_job_id:job||null,result:b.result,result_digest:digest,verification,finished_at:now(),bridge_result_retrieved:true,bridge_ticket_digest:null});await release(env,id);return json({ok:true,task_id:id,status:"completed",result_digest:digest,verification});
   }
   if(status==="cancelled"){
-    await save(env,id,{status:"cancelled",baidu_job_id:job||null,result_discarded:b.result_discarded===true,finished_at:now()});await release(env,id);return json({ok:true,task_id:id,status:"cancelled"});
+    await save(env,id,{status:"cancelled",baidu_job_id:job||null,result_discarded:b.result_discarded===true,bridge_ticket_digest:null,finished_at:now()});await release(env,id);return json({ok:true,task_id:id,status:"cancelled"});
   }
   if(status==="failed"){
-    const error=String(b.error||"BAIDU_BRIDGE_FAILED").slice(0,500);await save(env,id,{status:"failed",baidu_job_id:job||null,error,finished_at:now()});await release(env,id);return json({ok:true,task_id:id,status:"failed"});
+    const error=String(b.error||"BAIDU_BRIDGE_FAILED").slice(0,500);await save(env,id,{status:"failed",baidu_job_id:job||null,error,bridge_ticket_digest:null,finished_at:now()});await release(env,id);return json({ok:true,task_id:id,status:"failed"});
   }
   return err("INVALID_REQUEST","Unsupported callback status",400);
 }
