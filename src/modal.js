@@ -1,3 +1,5 @@
+import {ModalClient} from "modal";
+
 const PROVIDER="modal";
 const STARTER_FREE_CREDIT_USD_MONTHLY=30;
 
@@ -15,32 +17,59 @@ export function modalMeta(){
     token_secret_env:"MODAL_TOKEN_SECRET",
     authentication:"modal-api-token-pair",
     official_sdk:true,
+    official_sdk_version:"0.9.0",
     cpu:true,
     gpu:true,
     paid_fallback:false,
     free_credit_only:true,
     arbitrary_code_route:false,
     route_eligible:false,
-    acceptance_state:"registered-awaiting-credentials-and-live-e2e"
+    acceptance_state:"registered-awaiting-live-auth-and-compute-e2e"
   };
 }
 
-export function modalHealth(env){
+function baseHealth(env){
   const tokenId=String(env.MODAL_TOKEN_ID||"").trim();
   const tokenSecret=String(env.MODAL_TOKEN_SECRET||"").trim();
-  const configured=Boolean(tokenId&&tokenSecret);
-  return {
-    ok:configured,
-    provider:PROVIDER,
-    configured,
-    token_id_configured:Boolean(tokenId),
-    token_secret_configured:Boolean(tokenSecret),
-    authenticated:false,
-    live_probe:false,
-    route_eligible:false,
-    paid_fallback:false,
-    free_credit_only:true,
-    acceptance_state:configured?"credentials-present-awaiting-live-e2e":"credentials-required",
-    secret_echo:false
+  return {tokenId,tokenSecret,configured:Boolean(tokenId&&tokenSecret)};
+}
+
+function classifyModalError(e){
+  const s=String(e?.message||e||"").toLowerCase();
+  if(s.includes("unauth")||s.includes("permission")||s.includes("credential")||s.includes("token"))return"MODAL_AUTH_FAILED";
+  if(s.includes("timeout")||s.includes("deadline"))return"MODAL_AUTH_TIMEOUT";
+  if(s.includes("fetch")||s.includes("network")||s.includes("connect")||s.includes("grpc"))return"MODAL_NETWORK_OR_TRANSPORT_FAILED";
+  return"MODAL_LIVE_PROBE_FAILED";
+}
+
+export async function modalHealth(env){
+  const {tokenId,tokenSecret,configured}=baseHealth(env);
+  if(!configured)return {
+    ok:false,provider:PROVIDER,configured:false,
+    token_id_configured:Boolean(tokenId),token_secret_configured:Boolean(tokenSecret),
+    authenticated:false,live_probe:false,route_eligible:false,paid_fallback:false,free_credit_only:true,
+    acceptance_state:"credentials-required",secret_echo:false
   };
+  let client;
+  try{
+    client=new ModalClient({tokenId,tokenSecret,timeoutMs:8000,maxRetries:0,maxThrottleWaitSecs:0});
+    const builderVersion=await client.getImageBuilderVersion();
+    return {
+      ok:true,provider:PROVIDER,configured:true,
+      token_id_configured:true,token_secret_configured:true,
+      authenticated:true,live_probe:true,image_builder_version_present:Boolean(builderVersion),
+      route_eligible:false,paid_fallback:false,free_credit_only:true,
+      acceptance_state:"authenticated-awaiting-minimal-compute-e2e",secret_echo:false
+    };
+  }catch(e){
+    return {
+      ok:false,provider:PROVIDER,configured:true,
+      token_id_configured:true,token_secret_configured:true,
+      authenticated:false,live_probe:true,error_class:classifyModalError(e),
+      route_eligible:false,paid_fallback:false,free_credit_only:true,
+      acceptance_state:"live-auth-failed",secret_echo:false
+    };
+  }finally{
+    try{client?.close()}catch{}
+  }
 }
