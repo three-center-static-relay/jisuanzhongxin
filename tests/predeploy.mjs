@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {extractKaggleResult,officialMeta as kaggleOfficialMeta} from "../src/kaggle-official.js";
 import {baiduAIStudioMeta,probeBaiduAIStudio} from "../src/baidu-aistudio.js";
+import {probeWolfram,queryWolfram,wolframMeta} from "../src/wolfram.js";
 
 const expected={ok:true,task_id:"cpu-001",profile:"core",accelerator:"cpu"};
 const encoded=JSON.stringify(expected);
@@ -36,6 +37,18 @@ assert.equal(noToken.automation_ready,false);
 assert.equal(noToken.dispatch_enabled,false);
 assert.equal(noToken.secret_echo,false);
 
+const wm=wolframMeta();
+assert.equal(wm.provider,"wolfram-alpha");
+assert.equal(wm.integration,"official-full-results-api-v2");
+assert.equal(wm.secret_name,"WOLFRAM_APP_ID");
+assert.equal(wm.arbitrary_url,false);
+assert.equal(wm.arbitrary_code,false);
+assert.equal(wm.route_eligible,true);
+const noAppId=await probeWolfram({});
+assert.equal(noAppId.configured,false);
+assert.equal(noAppId.authenticated,false);
+assert.equal(noAppId.secret_echo,false);
+
 const originalFetch=globalThis.fetch;
 try{
   let seenAuthorization="";
@@ -65,8 +78,32 @@ try{
   assert.equal(denied.token_probe_http_status,401);
   assert.equal(denied.secret_echo,false);
   assert.equal(JSON.stringify(denied).includes("synthetic-denied-token"),false);
+
+  let wolframUrl="";
+  globalThis.fetch=async(url)=>{
+    wolframUrl=String(url);
+    return new Response(JSON.stringify({queryresult:{success:true,error:false,numpods:2,datatypes:"Math",timing:0.01,pods:[{title:"Input interpretation",id:"Input",scanner:"Identity",subpods:[{plaintext:"2+2"}]},{title:"Result",id:"Result",scanner:"Numeric",primary:true,subpods:[{plaintext:"4"}]}]}}),{status:200,headers:{"content-type":"application/json"}});
+  };
+  const syntheticAppId="SYNTHETIC-APPID";
+  const wq=await queryWolfram({WOLFRAM_APP_ID:syntheticAppId},"2+2");
+  assert.equal(wq.result.success,true);
+  assert.equal(wq.result.pods.find(x=>x.id==="Result")?.subpods?.[0]?.plaintext,"4");
+  const wu=new URL(wolframUrl);
+  assert.equal(`${wu.origin}${wu.pathname}`,"https://api.wolframalpha.com/v2/query");
+  assert.equal(wu.searchParams.get("appid"),syntheticAppId);
+  assert.equal(wu.searchParams.get("input"),"2+2");
+  assert.equal(wu.searchParams.get("output"),"json");
+  assert.equal(wu.searchParams.get("format"),"plaintext");
+  assert.equal(JSON.stringify(wq).includes(syntheticAppId),false);
+  const wp=await probeWolfram({WOLFRAM_APP_ID:syntheticAppId});
+  assert.equal(wp.ok,true);
+  assert.equal(wp.authenticated,true);
+  assert.equal(wp.computation_ok,true);
+  assert.equal(wp.secret_echo,false);
+  assert.equal(JSON.stringify(wp).includes(syntheticAppId),false);
+  await assert.rejects(()=>queryWolfram({WOLFRAM_APP_ID:syntheticAppId},"x".repeat(2001)),/WOLFRAM_INPUT_TOO_LONG/);
 }finally{
   globalThis.fetch=originalFetch;
 }
 
-console.log(JSON.stringify({ok:true,suite:"predeploy",kaggle_result_parser:true,kaggle_meta:true,baidu_policy:true,baidu_token_probe_mock:true,baidu_negative_auth:true,unsupported_baidu_native_http_removed:true,network:false}));
+console.log(JSON.stringify({ok:true,suite:"predeploy",kaggle_result_parser:true,kaggle_meta:true,baidu_policy:true,baidu_token_probe_mock:true,baidu_negative_auth:true,wolfram_contract:true,wolfram_secret_redaction:true,wolfram_fixed_endpoint:true,unsupported_baidu_native_http_removed:true,network:false}));
