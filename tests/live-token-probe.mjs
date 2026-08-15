@@ -1,0 +1,3 @@
+const endpoint="https://compute-worker.a15280020511.workers.dev/__diag/kaggle-live-41d820f5-4211-47dc-bf08-0b5316d602ae";
+const c=new AbortController(),t=setTimeout(()=>c.abort(),30000);
+try{const r=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({action:"token_probe"}),signal:c.signal});const b=await r.json().catch(()=>null);if(r.status!==200||b?.token_active!==true||b?.username_resolved!==true||b?.secret_echo!==false)throw new Error(`TOKEN_PROBE_FAILED_${r.status}`);console.log(JSON.stringify({ok:true,phase:"kaggle-rpc-token-introspection",token_active:true,username_resolved:true,secret_echo:false}))}finally{clearTimeout(t)}
