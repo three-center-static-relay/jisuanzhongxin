@@ -11,12 +11,14 @@ import bridge_entry2 as parser_impl
 TARGET_RESULT = "three-center-result.json"
 
 
-def _fail(task_id, job_id, failure_class):
+def _fail(task_id, stored_job_id, failure_class):
+    # Keep callbacks tied to the legacy stored id. A recovered real pipeline id
+    # is used only inside CircleCI so Cloudflare's mismatch guard remains intact.
     impl.callback(
         task_id,
         "CHECK",
         "failed",
-        baidu_job_id=job_id,
+        baidu_job_id=stored_job_id,
         error=failure_class,
         failure_class=failure_class,
         stage="result_polling",
@@ -35,29 +37,63 @@ def _stage_category(stage):
     return "unknown"
 
 
-def _query_pipeline(token, job_id):
+def _query_pipeline(token, pipeline_id):
     try:
         from aistudio_sdk.requests import pipeline as pp_request
-        resp = pp_request.query(token, job_id, "", "")
+        resp = pp_request.query(token, pipeline_id, "", "")
     except Exception:
         return {"ok": False, "failure_class": "BAIDU_QUERY_REQUEST_FAILED"}
     if not isinstance(resp, dict) or int(resp.get("errorCode", -1)) != 0:
         return {"ok": False, "failure_class": "BAIDU_QUERY_API_ERROR"}
     rows = resp.get("result") or []
-    row = next((x for x in rows if str(x.get("pipelineId", "")) == str(job_id)), None)
+    row = next((x for x in rows if str(x.get("pipelineId", "")) == str(pipeline_id)), None)
     if not row:
         return {"ok": False, "failure_class": "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND"}
     stage = str(row.get("stage") or "")
-    return {"ok": True, "category": _stage_category(stage)}
+    return {"ok": True, "category": _stage_category(stage), "pipeline_id": str(row.get("pipelineId") or pipeline_id)}
 
 
-def _list_output(token, job_id):
+def _select_pipeline_row(rows, expected_name):
+    exact = [x for x in (rows or []) if str(x.get("pipelineName") or "").strip() == expected_name]
+    if not exact:
+        return None
+    # The deterministic name should normally be unique. If a historical retry
+    # exists, newest createTime is the safest bounded choice.
+    exact.sort(key=lambda x: str(x.get("createTime") or ""), reverse=True)
+    row = exact[0]
+    pid = str(row.get("pipelineId") or "").strip()
+    return row if pid else None
+
+
+def _resolve_pipeline_by_name(token, task_id):
+    expected_name = parser_impl.expected_task_name(task_id)
+    if not expected_name:
+        return {"ok": False, "failure_class": "BAIDU_PIPELINE_NAME_INVALID"}
+    try:
+        from aistudio_sdk.requests import pipeline as pp_request
+        resp = pp_request.query(token, "", expected_name, "")
+    except Exception:
+        return {"ok": False, "failure_class": "BAIDU_PIPELINE_RECOVERY_REQUEST_FAILED"}
+    if not isinstance(resp, dict) or int(resp.get("errorCode", -1)) != 0:
+        return {"ok": False, "failure_class": "BAIDU_PIPELINE_RECOVERY_API_ERROR"}
+    row = _select_pipeline_row(resp.get("result") or [], expected_name)
+    if not row:
+        return {"ok": False, "failure_class": "BAIDU_PIPELINE_RECOVERY_NOT_FOUND"}
+    pid = str(row.get("pipelineId") or "").strip()
+    return {
+        "ok": True,
+        "pipeline_id": pid,
+        "category": _stage_category(row.get("stage")),
+    }
+
+
+def _list_output(token, pipeline_id):
     try:
         from aistudio_sdk.requests import pipeline as pp_request
         from baidubce.auth.bce_credentials import BceCredentials
         from baidubce.bce_client_configuration import BceClientConfiguration
         from baidubce.services.bos.bos_client import BosClient
-        resp = pp_request.bosacl_ls_cp(token, job_id)
+        resp = pp_request.bosacl_ls_cp(token, pipeline_id)
     except Exception:
         return {"ok": False, "failure_class": "BAIDU_OUTPUT_ACCESS_REQUEST_FAILED"}
     if not isinstance(resp, dict) or int(resp.get("errorCode", -1)) != 0:
@@ -84,31 +120,47 @@ def _list_output(token, job_id):
         return {"ok": False, "failure_class": "BAIDU_OUTPUT_LIST_FAILED"}
 
 
-def diagnostic_check(task_id, job_id):
-    if not job_id:
+def diagnostic_check(task_id, stored_job_id):
+    if not stored_job_id:
         raise RuntimeError("MISSING_BAIDU_JOB_ID")
-    impl.callback(task_id, "CHECK", "running", baidu_job_id=job_id, stage="result_polling")
+    impl.callback(task_id, "CHECK", "running", baidu_job_id=stored_job_id, stage="result_polling")
     token = impl.env("BAIDU_AISTUDIO_ACCESS_TOKEN")
 
-    q = _query_pipeline(token, job_id)
-    if not q.get("ok"):
-        return _fail(task_id, job_id, q["failure_class"])
-    if q.get("category") == "not_finished":
-        return _fail(task_id, job_id, "BAIDU_JOB_NOT_FINISHED")
-    if q.get("category") == "terminal_failed":
-        return _fail(task_id, job_id, "BAIDU_JOB_TERMINAL_FAILED")
+    active_pipeline_id = stored_job_id
+    recovered = False
+    q = _query_pipeline(token, active_pipeline_id)
+    if not q.get("ok") and q.get("failure_class") == "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND":
+        recovery = _resolve_pipeline_by_name(token, task_id)
+        if not recovery.get("ok"):
+            return _fail(task_id, stored_job_id, recovery["failure_class"])
+        active_pipeline_id = recovery["pipeline_id"]
+        recovered = active_pipeline_id != stored_job_id
+        q = {"ok": True, "category": recovery.get("category", "unknown"), "pipeline_id": active_pipeline_id}
+    elif not q.get("ok"):
+        return _fail(task_id, stored_job_id, q["failure_class"])
 
-    listing = _list_output(token, job_id)
+    if q.get("category") == "not_finished":
+        return _fail(task_id, stored_job_id, "BAIDU_JOB_NOT_FINISHED")
+    if q.get("category") == "terminal_failed":
+        return _fail(task_id, stored_job_id, "BAIDU_JOB_TERMINAL_FAILED")
+
+    listing = _list_output(token, active_pipeline_id)
     if not listing.get("ok"):
-        return _fail(task_id, job_id, listing["failure_class"])
+        return _fail(task_id, stored_job_id, listing["failure_class"])
     if not listing.get("target_present"):
-        return _fail(task_id, job_id, "BAIDU_RESULT_FILE_NOT_LISTED")
+        return _fail(task_id, stored_job_id, "BAIDU_RESULT_FILE_NOT_LISTED")
 
     with tempfile.TemporaryDirectory(prefix="three-center-check4-") as td:
-        result = impl.fetch_result(task_id, job_id, pathlib.Path(td) / TARGET_RESULT)
+        result = impl.fetch_result(task_id, active_pipeline_id, pathlib.Path(td) / TARGET_RESULT)
     if result is None:
-        return _fail(task_id, job_id, "BAIDU_RESULT_LISTED_BUT_DOWNLOAD_FAILED")
-    impl.callback(task_id, "FETCH", "completed", baidu_job_id=job_id, result=result, stage="result_retrieved")
+        return _fail(task_id, stored_job_id, "BAIDU_RESULT_LISTED_BUT_DOWNLOAD_FAILED")
+
+    if recovered:
+        # Omit corrected pipeline id from callback. Router will retain the stored
+        # legacy id while validating the real V100 result and digest.
+        impl.callback(task_id, "FETCH", "completed", result=result, stage="result_retrieved")
+    else:
+        impl.callback(task_id, "FETCH", "completed", baidu_job_id=stored_job_id, result=result, stage="result_retrieved")
     return 0
 
 
@@ -127,7 +179,16 @@ def selftest():
         actual = _stage_category(raw)
         if actual != expected:
             raise AssertionError(f"STAGE_CLASS_MISMATCH:{raw}:{actual}:{expected}")
-    print(json.dumps({"ok": True, "suite": "baidu-status-output-diagnostic", "cases": len(cases)}))
+    name = "three-center-baidu-circleci-live-20260815d"
+    rows = [
+        {"pipelineId": "111", "pipelineName": "other", "stage": "success", "createTime": "2026-08-15 10:00:00"},
+        {"pipelineId": "222", "pipelineName": name, "stage": "success", "createTime": "2026-08-15 10:01:00"},
+        {"pipelineId": "333", "pipelineName": name, "stage": "success", "createTime": "2026-08-15 10:02:00"},
+    ]
+    picked = _select_pipeline_row(rows, name)
+    if not picked or str(picked.get("pipelineId")) != "333":
+        raise AssertionError("PIPELINE_NAME_RECOVERY_SELECTION_FAILED")
+    print(json.dumps({"ok": True, "suite": "baidu-status-output-diagnostic-v2", "cases": len(cases) + 1, "pid_recovery": True}))
     return 0
 
 
