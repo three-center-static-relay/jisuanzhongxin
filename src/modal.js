@@ -63,11 +63,12 @@ export async function modalHealth(env){
   if(!bridgeConfigured)return {ok:false,...base,authenticated:false,live_probe:false,acceptance_state:"https-bridge-config-required"};
   if(!validHttpsUrl(endpoint)||!/^wk-[A-Za-z0-9_-]+$/.test(proxyId)||!/^ws-[A-Za-z0-9_-]+$/.test(proxySecret))return {ok:false,...base,authenticated:false,live_probe:false,error_class:"MODAL_BRIDGE_CONFIG_INVALID",acceptance_state:"https-bridge-config-invalid"};
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),8000);
+  const timer=setTimeout(()=>controller.abort(),30000);
   try{
+    const started=Date.now();
     const r=await fetch(`${endpoint}/health`,{method:"GET",headers:{"Modal-Key":proxyId,"Modal-Secret":proxySecret,"Accept":"application/json"},signal:controller.signal});
     const ok=r.ok;
-    return {ok,...base,authenticated:ok,live_probe:true,http_status:r.status,acceptance_state:ok?"https-bridge-authenticated-awaiting-compute-e2e":"https-bridge-health-failed"};
+    return {ok,...base,authenticated:ok,live_probe:true,http_status:r.status,probe_elapsed_ms:Date.now()-started,acceptance_state:ok?"https-bridge-authenticated-awaiting-compute-e2e":"https-bridge-health-failed"};
   }catch(e){
     return {ok:false,...base,authenticated:false,live_probe:true,error_class:e?.name==="AbortError"?"MODAL_BRIDGE_TIMEOUT":"MODAL_BRIDGE_UNAVAILABLE",acceptance_state:"https-bridge-health-failed"};
   }finally{clearTimeout(timer)}
