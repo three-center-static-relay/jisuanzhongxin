@@ -1,0 +1,31 @@
+{
+  "schema_version":"1.0",
+  "name":"personal-hospital-cluster-compute",
+  "network":"deny",
+  "input":"immutable governed clinical data pack",
+  "capabilities":[
+    "vital-sign trend analysis",
+    "laboratory unit normalization and longitudinal delta analysis",
+    "reference-range and age-sex-context aware flagging when ranges are supplied",
+    "Bayesian-style differential probability updating without claiming calibrated disease probability unless validated",
+    "time-series symptom and biomarker trajectory analysis",
+    "validated clinical risk-score execution only with source/version/eligibility checks",
+    "medication list normalization inputs and interaction/contraindication computation from governed evidence packs",
+    "medical imaging preprocessing and MONAI synthetic-preflight-gated analysis",
+    "DICOM/NIfTI metadata and image feature workflow",
+    "uncertainty, sensitivity and missing-data analysis",
+    "cross-source result reconciliation",
+    "longitudinal follow-up and outcome reconciliation"
+  ],
+  "medical_imaging_stack":{"framework":"MONAI","required":["torch","monai","pydicom","nibabel"],"optional":["SimpleITK"],"runtime_install":false,"runtime_network":false,"patient_use_gate":"real runtime audit + governed private data path"},
+  "forbidden":[
+    "autonomous diagnosis as final truth",
+    "autonomous prescription or dose change",
+    "invented lab reference range",
+    "invented disease probability",
+    "using synthetic data as patient evidence",
+    "runtime package installation",
+    "network retrieval from compute"
+  ],
+  "required_outputs":["calculation_receipt","input_checksums","assumptions","missingness","uncertainty","conflicts","validation_flags","result_version"]
+}
