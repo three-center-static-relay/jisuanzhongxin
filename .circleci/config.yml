@@ -31,6 +31,9 @@ jobs:
           name: Validate AI Studio job-id parser
           command: python bridge/baidu/bridge_entry2.py --selftest-parser
       - run:
+          name: Validate Baidu CHECK diagnostic classifier
+          command: python bridge/baidu/bridge_entry3.py --selftest-diagnostic
+      - run:
           name: Run bounded Baidu CLI bridge
           when: always
           no_output_timeout: 10m
@@ -39,7 +42,7 @@ jobs:
             BRIDGE_TASK_ID: << pipeline.parameters.task_id >>
             BRIDGE_BAIDU_JOB_ID: << pipeline.parameters.baidu_job_id >>
             BRIDGE_TICKET: << pipeline.parameters.bridge_ticket >>
-          command: python bridge/baidu/bridge_entry2.py
+          command: python bridge/baidu/bridge_entry3.py
 
 workflows:
   baidu-cli-bridge:
