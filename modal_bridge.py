@@ -5,10 +5,11 @@ import modal
 from fastapi import FastAPI, HTTPException
 
 APP_NAME = "compute-center-modal-bridge"
-API_VERSION = "2026-08-16.3"
+API_VERSION = "2026-08-16.4"
 MAX_VECTOR_ITEMS = 100_000
 
 image = modal.Image.debian_slim(python_version="3.12").pip_install("fastapi[standard]")
+gpu_image = modal.Image.debian_slim(python_version="3.12").pip_install("fastapi", "torch")
 app = modal.App(APP_NAME)
 web = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -31,6 +32,7 @@ def health():
         "memory_limit_mib": 256,
         "paid_fallback": False,
         "web_function_retries": "unsupported-by-modal-and-omitted",
+        "gpu_selftest": "t4-separate-proxy-auth-web-function",
     }
 
 
@@ -86,3 +88,50 @@ def bounded_compute(item: dict):
 @modal.asgi_app(requires_proxy_auth=True)
 def bridge():
     return web
+
+
+@app.function(
+    image=gpu_image,
+    gpu="T4",
+    cpu=(0.125, 0.25),
+    memory=(256, 512),
+    min_containers=0,
+    max_containers=1,
+    scaledown_window=30,
+    timeout=45,
+    block_network=True,
+    restrict_modal_access=True,
+)
+@modal.concurrent(max_inputs=1)
+@modal.fastapi_endpoint(method="POST", requires_proxy_auth=True, docs=False)
+def gpu_selftest(item: dict):
+    n = item.get("n", 10_000)
+    if not isinstance(n, int) or n < 1 or n > MAX_VECTOR_ITEMS:
+        raise HTTPException(status_code=400, detail="n must be an integer in [1, 100000]")
+
+    import torch
+
+    if not torch.cuda.is_available():
+        raise HTTPException(status_code=503, detail="CUDA unavailable")
+
+    torch.cuda.synchronize()
+    started = time.perf_counter()
+    x = torch.arange(1, n + 1, dtype=torch.int64, device="cuda")
+    checksum = int(torch.sum(x * x).item())
+    torch.cuda.synchronize()
+    elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
+
+    return {
+        "ok": True,
+        "selftest": "modal-t4-gpu-bridge",
+        "gpu_requested": "T4",
+        "cuda_available": True,
+        "device_type": "cuda",
+        "device_name": str(torch.cuda.get_device_name(0))[:120],
+        "n": n,
+        "checksum": checksum,
+        "elapsed_ms": elapsed_ms,
+        "arbitrary_code": False,
+        "network": "deny",
+        "max_containers": 1,
+    }
