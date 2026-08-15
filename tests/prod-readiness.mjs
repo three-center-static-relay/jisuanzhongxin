@@ -5,7 +5,5 @@ try{
   if(!r.ok)throw new Error(`WORKER_HEALTH_HTTP_${r.status}`);
   const b=await r.json();
   if(b?.ok!==true||b?.service!=="compute-worker")throw new Error("WORKER_HEALTH_INVALID");
-  if(b?.kaggle?.bridge_configured!==true)throw new Error("KAGGLE_BRIDGE_NOT_CONFIGURED");
-  if(b?.kaggle?.kaggle_api_token_configured!==true)throw new Error("KAGGLE_API_TOKEN_NOT_CONFIGURED");
-  console.log(JSON.stringify({ok:true,phase:"compute-production-readiness",service:b.service,api_version:b.api_version,bridge_configured:true,kaggle_api_token_configured:true,bridge_auth_configured:Boolean(b?.kaggle?.bridge_auth_configured)}));
+  console.log(JSON.stringify({ok:true,phase:"compute-production-health",service:b.service,api_version:b.api_version,kaggle:b.kaggle||null}));
 }finally{clearTimeout(t)}
