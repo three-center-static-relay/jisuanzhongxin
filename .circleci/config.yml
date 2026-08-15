@@ -28,6 +28,9 @@ jobs:
           name: Install pinned official AI Studio SDK
           command: python -m pip install --disable-pip-version-check --no-input "aistudio-sdk==0.3.8"
       - run:
+          name: Validate Baidu submit confirmation
+          command: python bridge/baidu/bridge.py --selftest-parser
+      - run:
           name: Validate AI Studio job-id parser
           command: python bridge/baidu/bridge_entry2.py --selftest-parser
       - run:
