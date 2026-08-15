@@ -5,7 +5,7 @@ import modal
 from fastapi import FastAPI, HTTPException
 
 APP_NAME = "compute-center-modal-bridge"
-API_VERSION = "2026-08-16.1"
+API_VERSION = "2026-08-16.2"
 MAX_VECTOR_ITEMS = 100_000
 
 image = modal.Image.debian_slim(python_version="3.12").pip_install("fastapi[standard]")
@@ -24,6 +24,11 @@ def health():
         "arbitrary_code": False,
         "network": "deny",
         "max_containers": 1,
+        "max_inputs_per_container": 1,
+        "cpu_request": 0.125,
+        "cpu_limit": 0.25,
+        "memory_request_mib": 128,
+        "memory_limit_mib": 256,
         "paid_fallback": False,
     }
 
@@ -67,15 +72,17 @@ def bounded_compute(item: dict):
 
 @app.function(
     image=image,
-    cpu=0.125,
-    memory=128,
+    cpu=(0.125, 0.25),
+    memory=(128, 256),
     min_containers=0,
     max_containers=1,
     scaledown_window=30,
     retries=0,
     timeout=30,
     block_network=True,
+    restrict_modal_access=True,
 )
+@modal.concurrent(max_inputs=1)
 @modal.asgi_app(requires_proxy_auth=True)
 def bridge():
     return web
