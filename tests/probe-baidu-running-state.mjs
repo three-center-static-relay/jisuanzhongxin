@@ -6,4 +6,6 @@ const t=b?.task||{};
 console.log(JSON.stringify({http:r.status,status:t.status||null,stage:t.bridge_stage||null,failure_class:t.failure_class||null,jobid:t.baidu_job_id_present===true,verification_ok:t.verification_ok===true,retrieved:t.bridge_result_retrieved===true}));
 assert.equal(r.status,200,`status HTTP ${r.status}`);
 assert.equal(new Set(["running","bridge_checking"]).has(t.status),true,`persisted status=${t.status}`);
-assert.equal(t.verification_ok,true,false);
+assert.notEqual(t.verification_ok,true,"unexpected verification success");
+assert.notEqual(t.bridge_result_retrieved,true,"unexpected result retrieval");
+console.log(JSON.stringify({ok:true,suite:"baidu-persisted-running-state"}));
