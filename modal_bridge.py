@@ -5,7 +5,7 @@ import modal
 from fastapi import FastAPI, HTTPException
 
 APP_NAME = "compute-center-modal-bridge"
-API_VERSION = "2026-08-16.4"
+API_VERSION = "2026-08-16.5"
 MAX_VECTOR_ITEMS = 100_000
 
 image = modal.Image.debian_slim(python_version="3.12").pip_install("fastapi[standard]")
@@ -33,6 +33,10 @@ def health():
         "paid_fallback": False,
         "web_function_retries": "unsupported-by-modal-and-omitted",
         "gpu_selftest": "t4-separate-proxy-auth-web-function",
+        "gpu_cpu_request": 0.5,
+        "gpu_cpu_limit": 1.0,
+        "gpu_memory_request_mib": 512,
+        "gpu_memory_limit_mib": 2048,
     }
 
 
@@ -93,12 +97,12 @@ def bridge():
 @app.function(
     image=gpu_image,
     gpu="T4",
-    cpu=(0.125, 0.25),
-    memory=(256, 512),
+    cpu=(0.5, 1.0),
+    memory=(512, 2048),
     min_containers=0,
     max_containers=1,
     scaledown_window=30,
-    timeout=45,
+    timeout=90,
     block_network=True,
     restrict_modal_access=True,
 )
