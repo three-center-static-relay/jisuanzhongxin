@@ -20,6 +20,10 @@ export const AUTONOMY_POLICY=Object.freeze({
 
 export const BAIDU_RUNTIME_POLICY=Object.freeze({
   sdk:"aistudio-sdk==0.3.8",
+  sdk_upgrade_candidate:"aistudio-sdk==0.3.9",
+  sdk_upgrade_for_diagnostics:false,
+  diagnostic_surface:"pipeline-query-stage-only",
+  public_callable_log_detail_info:{"0.3.8":false,"0.3.9":false},
   device:"v100",
   gpus:1,
   payment:"coupon",
@@ -27,7 +31,18 @@ export const BAIDU_RUNTIME_POLICY=Object.freeze({
   paid_fallback:false,
   production_runtime:null,
   candidate_runtime:"paddle2.4_py3.7",
-  candidate_state:"CANDIDATE",
+  candidate_state:"DEGRADED",
+  candidate_evidence:{
+    live_e2e_failures:1,
+    latest_state:"failed",
+    latest_failure_class:"BAIDU_JOB_TERMINAL_FAILED",
+    result_digest_present:false,
+    bridge_result_retrieved:false,
+    v100_cuda_verified:false,
+    production_promoted:false,
+    diagnostic_root_cause_available:false,
+    diagnostic_limitation:"PUBLIC_SDK_EXPOSES_STAGE_QUERY_BUT_NO_CALLABLE_LOG_DETAIL_INFO"
+  },
   quarantined_runtimes:["paddle2.6_py3.10","paddle2.5_py3.10"],
   quarantine_evidence:{
     "paddle2.6_py3.10":{state:"QUARANTINED",reason:"LIVE_E2E_FAILED"},
@@ -35,6 +50,8 @@ export const BAIDU_RUNTIME_POLICY=Object.freeze({
   },
   fallback_candidates:[],
   automatic_candidate_execution:false,
+  automatic_same_failure_retry:false,
+  candidate_retest_policy:"manual-single-retest-only",
   promotion_requires:["live_e2e","v100_cuda_verified","result_digest","bridge_result_retrieved"]
 });
 
