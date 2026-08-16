@@ -5,7 +5,9 @@ import {AUTONOMY_POLICY,BAIDU_RUNTIME_POLICY} from "../src/provider-autonomy.js"
 const autonomy=fs.readFileSync(new URL("../src/provider-autonomy.js",import.meta.url),"utf8");
 const admin=fs.readFileSync(new URL("../src/admin-entry.js",import.meta.url),"utf8");
 const baidu=fs.readFileSync(new URL("../src/baidu-circleci.js",import.meta.url),"utf8");
+const router=fs.readFileSync(new URL("../src/baidu-circleci-router.js",import.meta.url),"utf8");
 const bridge=fs.readFileSync(new URL("../bridge/baidu/bridge_entry9.py",import.meta.url),"utf8");
+const runtime=fs.readFileSync(new URL("../bridge/baidu/job/run.py",import.meta.url),"utf8");
 const wrangler=fs.readFileSync(new URL("../wrangler.jsonc",import.meta.url),"utf8");
 
 for(const state of ["VERIFIED","DEGRADED","QUARANTINED","CANDIDATE","DISABLED"])assert.match(autonomy,new RegExp(`"${state}"`));
@@ -41,5 +43,18 @@ assert.match(bridge,/STATUS_PROBE_EVERY_POLLS = 2/);
 assert.match(bridge,/check_impl\._query_pipeline\(token, job_id\)/);
 assert.match(bridge,/BAIDU_JOB_TERMINAL_FAILED/);
 assert.match(bridge,/stage="baidu_terminal_failed"/);
+assert.match(bridge,/_runtime_failure_class\(result\)/);
+assert.match(bridge,/BAIDU_RUNTIME_EXECUTION_ERROR/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,baidu_candidate:"paddle2.5_py3.10",baidu_e2e_gate_preserved:true,baidu_terminal_fast_exit:true}));
+assert.match(runtime,/nvidia-smi/);
+assert.match(runtime,/--query-gpu=name/);
+assert.match(runtime,/"V100" not in gpu_name\.upper\(\)/);
+assert.match(runtime,/paddle\.device\.is_compiled_with_cuda\(\)/);
+assert.match(runtime,/"gpu_name": gpu_name/);
+assert.match(runtime,/"paddle_cuda": paddle_cuda/);
+assert.match(router,/V100_RUNTIME_ATTESTATION_FAILED/);
+assert.match(router,/\/v100\/i\.test\(String\(r\.gpu_name/);
+assert.match(router,/r\.paddle_cuda!==true/);
+assert.match(router,/"baidu_terminal_failed"/);
+
+console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,baidu_candidate:"paddle2.5_py3.10",baidu_e2e_gate_preserved:true,baidu_terminal_fast_exit:true,baidu_runtime_v100_attestation:true,runtime_failure_passthrough:true}));
