@@ -1,4 +1,5 @@
 import app,{CenterGate} from "./production-entry.js";
+import {getAutonomySnapshot,runAutonomySweep} from "./provider-autonomy.js";
 export {CenterGate};
 
 const ORIGIN="https://compute.internal";
@@ -24,8 +25,9 @@ async function adminContext(env,ctx){
   const source=await readApp("/source",env,ctx);
   const acceptance=await readApp("/v1/acceptance/latest",env,ctx);
   const gate=await readGate(env);
+  const autonomy=await getAutonomySnapshot(env);
   const version=env.CF_VERSION_METADATA||{};
-  const ok=health.http_status===200&&health.body?.ok===true&&source.http_status===200&&source.body?.ok===true&&gate.ok===true;
+  const ok=health.http_status===200&&health.body?.ok===true&&source.http_status===200&&source.body?.ok===true&&gate.ok===true&&autonomy.ok===true;
   return json({
     ok,
     service:SERVICE,
@@ -35,6 +37,7 @@ async function adminContext(env,ctx){
     health:health.body,
     source:source.body,
     acceptance:acceptance.body,
+    autonomy,
     active_task:gate.active||null,
     active_state_verified:gate.ok===true,
     secrets_redacted:true
@@ -48,6 +51,13 @@ export default{
       if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"admin context is service-binding internal only"},403);
       return adminContext(env,ctx);
     }
+    if(req.method==="GET"&&url.pathname==="/v1/admin/autonomy"){
+      if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"autonomy status is service-binding internal only"},403);
+      return json(await getAutonomySnapshot(env));
+    }
     return app.fetch(req,env,ctx);
+  },
+  async scheduled(controller,env,ctx){
+    ctx.waitUntil(runAutonomySweep(app,env,ctx));
   }
 };
