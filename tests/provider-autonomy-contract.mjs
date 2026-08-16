@@ -10,6 +10,7 @@ const router=read("../src/baidu-circleci-router.js");
 const bridge=read("../bridge/baidu/bridge_entry9.py");
 const runtime=read("../bridge/baidu/job/run.py");
 const sdkProbe=read("../bridge/baidu/sdk_selftest.py");
+const sdkWrapper=read("../src/production-entry-baidu-sdk039-selftest.js");
 const wrangler=read("../wrangler.jsonc");
 
 for(const state of ["VERIFIED","DEGRADED","QUARANTINED","CANDIDATE","DISABLED"])assert.match(autonomy,new RegExp(`"${state}"`));
@@ -43,15 +44,16 @@ assert.equal(BAIDU_RUNTIME_POLICY.quarantine_evidence["paddle2.4_py3.7"].live_e2
 assert.equal(BAIDU_RUNTIME_POLICY.quarantine_evidence["paddle2.4_py3.7"].latest_bootstrap_reason,"BOOTSTRAP_NOT_AVAILABLE");
 assert.equal(BAIDU_RUNTIME_POLICY.quarantine_evidence["paddle2.5_py3.10"].live_e2e_failures,2);
 
-assert.match(admin,/async scheduled\(controller,env,ctx\)/);
+assert.match(admin,/async scheduled\(_controller,env,ctx\)/);
 assert.match(admin,/runAutonomySweep\(app,env,ctx\)/);
 assert.match(admin,/production-entry-baidu-sdk039-selftest\.js/);
-assert.match(admin,/SELFTEST_PATH/);
-assert.match(admin,/"\* \* \* \* \*"/);
+assert.doesNotMatch(admin,/SELFTEST_PATH/);
+assert.doesNotMatch(admin,/"\* \* \* \* \*"/);
 assert.doesNotMatch(admin,/P24B_TRIGGER_CRON/);
 assert.doesNotMatch(admin,/production-entry-baidu-p24b-e2e\.js/);
 assert.doesNotMatch(admin,/P25B_TRIGGER_CRON/);
-assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*",\s*"\* \* \* \* \*"\]\s*\}/);
+assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
+assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
 assert.match(wrangler,/baidu-p24b-final-acceptance-contract\.mjs/);
 assert.match(wrangler,/baidu-sdk039-selftest-contract\.mjs/);
 assert.doesNotMatch(wrangler,/baidu-p25b-canary-contract\.mjs/);
@@ -67,6 +69,11 @@ assert.match(sdkProbe,/EXPECTED_VERSION = "0\.3\.9"/);
 assert.match(sdkProbe,/"gpu_submitted": False/);
 assert.match(sdkProbe,/"compute_credit_used": False/);
 assert.doesNotMatch(sdkProbe,/submit\s+job/i);
+assert.match(sdkWrapper,/DIRECT_TRIGGER_PATH="\/__selftest\/baidu-sdk039-direct-20260816-[a-f0-9]{64}"/);
+assert.match(sdkWrapper,/op:"SDK_SELFTEST"/);
+assert.match(sdkWrapper,/gpu:false/);
+assert.match(sdkWrapper,/compute_credit_used:false/);
+assert.doesNotMatch(sdkWrapper,/op:"SUBMIT"/);
 
 assert.match(bridge,/RUNTIME_CANDIDATE = "paddle2\.4_py3\.7"/);
 assert.match(bridge,/BOOTSTRAP_SCHEMA = "baidu-bootstrap-sentinel-v1"/);
@@ -86,4 +93,4 @@ assert.match(runtime,/"paddle_cuda": paddle_cuda/);
 assert.match(router,/V100_RUNTIME_ATTESTATION_FAILED/);
 assert.match(router,/safeUpstreamDiagnostic/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,temporary_sdk039_control_plane_probe:true,p24b_trigger_removed:true,route_requires_live_health:true,baidu_last_candidate:"paddle2.4_py3.7",baidu_candidate_state:"QUARANTINED",live_e2e_failures:2,automatic_candidate_execution:false,automatic_same_failure_retry:false,production_runtime:null,bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",sdk039_gpu_submitted:false}));
+console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,temporary_sdk039_direct_probe:true,minute_cron:false,p24b_trigger_removed:true,route_requires_live_health:true,baidu_last_candidate:"paddle2.4_py3.7",baidu_candidate_state:"QUARANTINED",live_e2e_failures:2,automatic_candidate_execution:false,automatic_same_failure_retry:false,production_runtime:null,bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",sdk039_gpu_submitted:false}));
