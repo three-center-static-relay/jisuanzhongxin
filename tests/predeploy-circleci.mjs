@@ -4,6 +4,7 @@ import {baiduCircleCIMeta,digestBridgeTicket,newBridgeTicket,normalizeBaiduInput
 
 const missing=baiduCircleCIMeta({});
 assert.equal(missing.configured,false);
+assert.equal(missing.acceptance_flag_present,false);
 assert.equal(missing.e2e_verified,false);
 assert.equal(missing.route_eligible,false);
 assert.equal(missing.baidu_payment,"coupon");
@@ -14,9 +15,13 @@ assert.equal(missing.arbitrary_shell,false);
 assert.equal(missing.static_shared_secret_required,false);
 assert.equal(missing.ephemeral_ticket,true);
 
-const ready=baiduCircleCIMeta({CIRCLECI_API_TOKEN:"x",CIRCLECI_PROJECT_SLUG:"circleci/org/project",CIRCLECI_PIPELINE_DEFINITION_ID:"def",BAIDU_CIRCLECI_E2E_VERIFIED:"true"});
-assert.equal(ready.configured,true);
-assert.equal(ready.route_eligible,true);
+const acceptanceOnly=baiduCircleCIMeta({CIRCLECI_API_TOKEN:"x",CIRCLECI_PROJECT_SLUG:"circleci/org/project",CIRCLECI_PIPELINE_DEFINITION_ID:"def",BAIDU_CIRCLECI_E2E_VERIFIED:"true"});
+assert.equal(acceptanceOnly.configured,true);
+assert.equal(acceptanceOnly.acceptance_flag_present,true);
+assert.equal(acceptanceOnly.runtime_production,null);
+assert.equal(acceptanceOnly.e2e_verified,false);
+assert.equal(acceptanceOnly.route_eligible,false);
+assert.equal(acceptanceOnly.automation_ready,false);
 assert.deepEqual(normalizeBaiduInput({matrix_size:99999,rounds:99,seed:-1}),{matrix_size:2048,rounds:5,seed:1});
 
 const ticket=newBridgeTicket();
@@ -68,4 +73,4 @@ try{
   assert.equal(JSON.stringify(seen).includes("BAIDU_BRIDGE_SHARED_SECRET"),false);
 }finally{globalThis.fetch=oldFetch}
 
-console.log(JSON.stringify({ok:true,suite:"predeploy-circleci",fail_closed:true,coupon_only:true,fixed_v100:true,ephemeral_ticket:true,static_shared_secret:false,observable_stages:true,robust_job_id_parser:true,arbitrary_code:false,network:false}));
+console.log(JSON.stringify({ok:true,suite:"predeploy-circleci",fail_closed:true,coupon_only:true,fixed_v100:true,ephemeral_ticket:true,static_shared_secret:false,observable_stages:true,robust_job_id_parser:true,arbitrary_code:false,network:false,production_runtime_gate:true}));
