@@ -1,28 +1,23 @@
 import assert from "node:assert/strict";
 
-// Diagnostic-only: one-shot task B trigger. This PR is never merged.
-const url="https://compute-worker.a15280020511.workers.dev/__selftest/baidu-sdk039-direct-20260816-4aa2e07044ecd45921dc58d9ed8b6987d3138cb48f472d3c379d543275eef8d9";
+const url="https://compute-worker.a15280020511.workers.dev/__diagnostic/baidu-sdk039-control-result-b-20260816-02b50019f252cea7d92054e2cd44eff1";
 const c=new AbortController();
 const timer=setTimeout(()=>c.abort(),15000);
 try{
   const r=await fetch(url,{headers:{accept:"application/json"},signal:c.signal});
   const b=await r.json();
   assert.ok([200,202].includes(r.status));
-  assert.equal(b.ok,true);
-  if(b.already_started===true){
-    assert.ok(b.task&&typeof b.task==="object");
-    assert.equal(b.task.task_id,"baidu-sdk039-control-plane-20260816b");
-    assert.equal(b.task.sdk_candidate,"0.3.9");
-    assert.equal(b.task.gpu,false);
-    assert.equal(b.task.compute_credit_used,false);
-    assert.equal(b.task.production_promoted,false);
-  }else{
-    assert.equal(b.task_id,"baidu-sdk039-control-plane-20260816b");
-    assert.equal(b.status,"bridge_submitted");
-    assert.equal(b.sdk_version,"0.3.9");
-    assert.equal(b.gpu,false);
-    assert.equal(b.compute_credit_used,false);
-    assert.equal(b.one_shot,true);
-  }
-  console.log(JSON.stringify({ok:true,suite:"baidu-sdk039-isolated-direct-trigger",task_id:"baidu-sdk039-control-plane-20260816b",sdk_version:"0.3.9",gpu:false,compute_credit_used:false,one_shot:true}));
+  assert.equal(b.diagnostic,true);
+  assert.equal(b.one_shot,true);
+  assert.equal(b.sdk_version,"0.3.9");
+  assert.equal(b.gpu,false);
+  assert.equal(b.compute_credit_used,false);
+  assert.ok(b.task&&typeof b.task==="object");
+  assert.equal(b.task.task_id,"baidu-sdk039-control-plane-20260816b");
+  assert.equal(b.task.sdk_candidate,"0.3.9");
+  assert.equal(b.task.gpu,false);
+  assert.equal(b.task.compute_credit_used,false);
+  assert.equal(b.task.production_promoted,false);
+  assert.ok(["bridge_dispatching","bridge_submitted","running","completed","failed","cancelled"].includes(String(b.task.status||"")));
+  console.log(JSON.stringify({ok:true,suite:"baidu-sdk039-isolated-status",status:String(b.task.status||""),workflow_status:b.task.circleci_workflow_status||null,sdk_selftest_passed:b.task.sdk_selftest_passed===true,gpu:false,compute_credit_used:false}));
 }finally{clearTimeout(timer)}
