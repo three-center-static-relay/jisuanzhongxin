@@ -12,11 +12,11 @@ const P24_DIAG_PATH="/__diagnostic/baidu-p24-terminal-detail-20260816-6b5f0e91d6
 const P24_DIAG_EXPIRES_AT=Date.parse("2026-08-16T11:25:00Z");
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
-function gate(env){return env.CENTER_GATE.get(env.CENTER_GATE.idFromName("global"))}
+function gateHandle(env){return env.CENTER_GATE.get(env.CENTER_GATE.idFromName("global"))}
 async function gateCall(env,path,method="GET",body){
   const init={method,headers:{"content-type":"application/json"}};
   if(body!==undefined)init.body=JSON.stringify(body);
-  const response=await gate(env).fetch(new Request(`https://gate.internal${path}`,init));
+  const response=await gateHandle(env).fetch(new Request(`https://gate.internal${path}`,init));
   return {http_status:response.status,...await response.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}))};
 }
 async function loadTask(env,id){return gateCall(env,`/task/${encodeURIComponent(id)}`)}
@@ -94,7 +94,7 @@ async function readApp(path,env,ctx){
 
 async function readGate(env){
   if(!env.CENTER_GATE?.get||!env.CENTER_GATE?.idFromName)return {ok:false,error:"CENTER_GATE_UNAVAILABLE",active:null};
-  const response=await gate(env).fetch(new Request("https://gate.internal/state",{method:"GET"}));
+  const response=await gateHandle(env).fetch(new Request("https://gate.internal/state",{method:"GET"}));
   const body=await response.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}));
   return {http_status:response.status,...body};
 }
@@ -103,10 +103,10 @@ async function adminContext(env,ctx){
   const health=await readApp("/health",env,ctx);
   const source=await readApp("/source",env,ctx);
   const acceptance=await readApp("/v1/acceptance/latest",env,ctx);
-  const gateState=await readGate(env);
+  const gate=await readGate(env);
   const autonomy=await getAutonomySnapshot(env);
   const version=env.CF_VERSION_METADATA||{};
-  const ok=health.http_status===200&&health.body?.ok===true&&source.http_status===200&&source.body?.ok===true&&gateState.ok===true&&autonomy.ok===true;
+  const ok=health.http_status===200&&health.body?.ok===true&&source.http_status===200&&source.body?.ok===true&&gate.ok===true&&autonomy.ok===true;
   return json({
     ok,
     service:SERVICE,
@@ -117,8 +117,8 @@ async function adminContext(env,ctx){
     source:source.body,
     acceptance:acceptance.body,
     autonomy,
-    active_task:gateState.active||null,
-    active_state_verified:gateState.ok===true,
+    active_task:gate.active||null,
+    active_state_verified:gate.ok===true,
     secrets_redacted:true
   },ok?200:503);
 }
