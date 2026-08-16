@@ -22,7 +22,7 @@ export const BAIDU_RUNTIME_POLICY=Object.freeze({
   sdk:"aistudio-sdk==0.3.8",
   sdk_upgrade_candidate:"aistudio-sdk==0.3.9",
   sdk_upgrade_for_diagnostics:false,
-  diagnostic_surface:"pipeline-query-stage-only",
+  diagnostic_surface:"pipeline-query-stage-plus-bootstrap-sentinel",
   public_callable_log_detail_info:{"0.3.8":false,"0.3.9":false},
   device:"v100",
   gpus:1,
@@ -31,27 +31,29 @@ export const BAIDU_RUNTIME_POLICY=Object.freeze({
   paid_fallback:false,
   production_runtime:null,
   candidate_runtime:"paddle2.4_py3.7",
-  candidate_state:"DEGRADED",
+  candidate_state:"QUARANTINED",
   candidate_evidence:{
-    live_e2e_failures:1,
+    live_e2e_failures:2,
     latest_state:"failed",
     latest_failure_class:"BAIDU_JOB_TERMINAL_FAILED",
+    latest_bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",
     result_digest_present:false,
     bridge_result_retrieved:false,
     v100_cuda_verified:false,
     production_promoted:false,
     diagnostic_root_cause_available:false,
-    diagnostic_limitation:"PUBLIC_SDK_EXPOSES_STAGE_QUERY_BUT_NO_CALLABLE_LOG_DETAIL_INFO"
+    diagnostic_limitation:"BOOTSTRAP_SENTINEL_NOT_AVAILABLE_ON_SECOND_LIVE_E2E_FAILURE"
   },
-  quarantined_runtimes:["paddle2.6_py3.10","paddle2.5_py3.10"],
+  quarantined_runtimes:["paddle2.4_py3.7","paddle2.6_py3.10","paddle2.5_py3.10"],
   quarantine_evidence:{
+    "paddle2.4_py3.7":{state:"QUARANTINED",reason:"TWO_CONSECUTIVE_LIVE_E2E_FAILURES",live_e2e_failures:2,latest_failure_class:"BAIDU_JOB_TERMINAL_FAILED",latest_bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE"},
     "paddle2.6_py3.10":{state:"QUARANTINED",reason:"LIVE_E2E_FAILED"},
     "paddle2.5_py3.10":{state:"QUARANTINED",reason:"TWO_CONSECUTIVE_LIVE_E2E_FAILURES",live_e2e_failures:2,latest_circleci_state:"failure",latest_elapsed_seconds:195}
   },
   fallback_candidates:[],
   automatic_candidate_execution:false,
   automatic_same_failure_retry:false,
-  candidate_retest_policy:"manual-single-retest-only",
+  candidate_retest_policy:"blocked-until-upstream-runtime-change",
   promotion_requires:["live_e2e","v100_cuda_verified","result_digest","bridge_result_retrieved"]
 });
 
