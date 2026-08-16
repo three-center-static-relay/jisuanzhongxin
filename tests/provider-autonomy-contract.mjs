@@ -37,5 +37,9 @@ assert.doesNotMatch(baidu,/acoin_allowed:true/);
 assert.match(bridge,/RUNTIME_CANDIDATE = "paddle2\.5_py3\.10"/);
 assert.match(bridge,/"--payment", "coupon"/);
 assert.doesNotMatch(bridge,/"--payment", "acoin"/);
+assert.match(bridge,/STATUS_PROBE_EVERY_POLLS = 2/);
+assert.match(bridge,/check_impl\._query_pipeline\(token, job_id\)/);
+assert.match(bridge,/BAIDU_JOB_TERMINAL_FAILED/);
+assert.match(bridge,/stage="baidu_terminal_failed"/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,baidu_candidate:"paddle2.5_py3.10",baidu_e2e_gate_preserved:true}));
+console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,baidu_candidate:"paddle2.5_py3.10",baidu_e2e_gate_preserved:true,baidu_terminal_fast_exit:true}));
