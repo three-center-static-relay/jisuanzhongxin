@@ -66,10 +66,16 @@ for(const pattern of [/baidu_payment:"coupon"/,/free_only:true/,/paid_fallback:f
 assert.doesNotMatch(baidu,/acoin_allowed:true/);
 
 assert.match(sdkProbe,/EXPECTED_VERSION = "0\.3\.9"/);
+assert.match(sdkProbe,/QUERY_TIMEOUT_SECONDS = 25/);
+assert.match(sdkProbe,/AISTUDIO_PIPELINE_QUERY_TIMEOUT/);
+assert.match(sdkProbe,/SDK_SELFTEST_CALLBACK_PATH/);
 assert.match(sdkProbe,/"gpu_submitted": False/);
 assert.match(sdkProbe,/"compute_credit_used": False/);
+assert.match(sdkProbe,/"secrets_emitted": False/);
 assert.doesNotMatch(sdkProbe,/submit\s+job/i);
-assert.match(sdkWrapper,/DIRECT_TRIGGER_PATH="\/__selftest\/baidu-sdk039-direct-20260816-[a-f0-9]{64}"/);
+assert.match(sdkWrapper,/DIRECT_TRIGGER_PATH="\/__selftest\/baidu-sdk039-direct-c-20260816-[a-f0-9]{64}"/);
+assert.match(sdkWrapper,/CALLBACK_PATH="\/__callback\/baidu-sdk039-c-20260816-[a-f0-9]{64}"/);
+assert.match(sdkWrapper,/terminal_callback_received:true/);
 assert.match(sdkWrapper,/op:"SDK_SELFTEST"/);
 assert.match(sdkWrapper,/gpu:false/);
 assert.match(sdkWrapper,/compute_credit_used:false/);
@@ -93,4 +99,4 @@ assert.match(runtime,/"paddle_cuda": paddle_cuda/);
 assert.match(router,/V100_RUNTIME_ATTESTATION_FAILED/);
 assert.match(router,/safeUpstreamDiagnostic/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,temporary_sdk039_direct_probe:true,minute_cron:false,p24b_trigger_removed:true,route_requires_live_health:true,baidu_last_candidate:"paddle2.4_py3.7",baidu_candidate_state:"QUARANTINED",live_e2e_failures:2,automatic_candidate_execution:false,automatic_same_failure_retry:false,production_runtime:null,bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",sdk039_gpu_submitted:false}));
+console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,temporary_sdk039_task_c:true,bounded_query_seconds:25,terminal_callback:true,minute_cron:false,p24b_trigger_removed:true,route_requires_live_health:true,baidu_last_candidate:"paddle2.4_py3.7",baidu_candidate_state:"QUARANTINED",live_e2e_failures:2,automatic_candidate_execution:false,automatic_same_failure_retry:false,production_runtime:null,bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",sdk039_gpu_submitted:false}));
