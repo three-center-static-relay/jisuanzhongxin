@@ -3,7 +3,7 @@ import {maybeHandleBaiduCircleCI} from "./baidu-circleci-router.js";
 import {maybeHandleModels} from "./model-router.js";
 import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {medicalImagingMeta} from "./medical-imaging-toolkit.js";
-import {modalCpuSelftest,modalGpuSelftest,modalHealth,modalMeta} from "./modal.js";
+import {chooseModalAccelerator,modalCpuSelftest,modalGpuSelftest,modalHealth,modalMeta} from "./modal.js";
 export {CenterGate};
 
 async function normalizeMedicalImagingRequest(req){
@@ -23,6 +23,10 @@ export default {
     if(req.method==="GET"&&u.pathname==="/v1/toolkits/medical-imaging/meta")return Response.json({ok:true,...medicalImagingMeta(),request_profile:"medical-imaging",gpu_optional:true},{headers:{"cache-control":"no-store"}});
     if(req.method==="GET"&&u.pathname==="/v1/providers/modal/meta")return Response.json({ok:true,...modalMeta(),secret_echo:false},{headers:{"cache-control":"no-store"}});
     if(req.method==="GET"&&u.pathname==="/v1/providers/modal/health"){const p=await modalHealth(env);return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}})}
+    if(req.method==="POST"&&u.pathname==="/v1/providers/modal/route/plan"){
+      let body={};try{body=await req.json()}catch{}
+      return Response.json({ok:true,...chooseModalAccelerator(body),secret_echo:false},{headers:{"cache-control":"no-store"}});
+    }
     if(req.method==="POST"&&u.pathname==="/v1/providers/modal/selftest/cpu"){
       let body={};try{body=await req.json()}catch{}
       const n=body?.n===undefined?10000:Number(body.n);
