@@ -4,6 +4,7 @@ import {maybeHandleModels} from "./model-router.js";
 import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {medicalImagingMeta} from "./medical-imaging-toolkit.js";
 import {chooseModalAccelerator,modalCpuSelftest,modalGpuSelftest,modalHealth,modalMeta} from "./modal.js";
+import {runBaolongBusinessBenchmark} from "./modal-business-benchmark.js";
 export {CenterGate};
 
 async function normalizeMedicalImagingRequest(req){
@@ -37,6 +38,13 @@ export default {
       let body={};try{body=await req.json()}catch{}
       const n=body?.n===undefined?10000:Number(body.n);
       const p=await modalGpuSelftest(env,n);
+      return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}});
+    }
+    if(req.method==="POST"&&u.pathname==="/v1/providers/modal/benchmark/baolong-milk-tea"){
+      let body={};try{body=await req.json()}catch{}
+      const iterations=body?.iterations===undefined?1000000:Number(body.iterations);
+      const seed=body?.seed===undefined?20260816:Number(body.seed);
+      const p=await runBaolongBusinessBenchmark(env,{iterations,seed});
       return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}});
     }
     req=await normalizeMedicalImagingRequest(req);
