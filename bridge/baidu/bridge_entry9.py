@@ -14,7 +14,10 @@ STATUS_PROBE_EVERY_POLLS = 2
 
 def _terminal_failure_class(query_result):
     if isinstance(query_result, dict) and query_result.get("ok") is True and query_result.get("category") == "terminal_failed":
-        return "BAIDU_JOB_TERMINAL_FAILED"
+        failure_class = str(query_result.get("terminal_failure_class") or "BAIDU_JOB_TERMINAL_FAILED").strip().upper()
+        if not failure_class.startswith("BAIDU_JOB_"):
+            return "BAIDU_JOB_TERMINAL_FAILED"
+        return failure_class[:80]
     return None
 
 
@@ -82,6 +85,10 @@ def submit_and_wait_absolute(task_id):
                 query = check_impl._query_pipeline(token, job_id)
                 terminal_failure = _terminal_failure_class(query)
                 if terminal_failure:
+                    extra = {}
+                    diagnostic = query.get("diagnostic") if isinstance(query, dict) else None
+                    if isinstance(diagnostic, dict) and diagnostic:
+                        extra["upstream_diagnostic"] = diagnostic
                     impl.callback(
                         task_id,
                         "CHECK",
@@ -89,7 +96,8 @@ def submit_and_wait_absolute(task_id):
                         baidu_job_id=job_id,
                         error=terminal_failure,
                         failure_class=terminal_failure,
-                        stage="baidu_terminal_failed",
+                        stage="result_polling",
+                        **extra,
                     )
                     return 2
                 if not query.get("ok"):
@@ -115,6 +123,8 @@ def selftest():
         raise AssertionError("STATUS_PROBE_CADENCE_MISMATCH")
     if _terminal_failure_class({"ok": True, "category": "terminal_failed"}) != "BAIDU_JOB_TERMINAL_FAILED":
         raise AssertionError("TERMINAL_FAILURE_CLASSIFICATION_MISMATCH")
+    if _terminal_failure_class({"ok": True, "category": "terminal_failed", "terminal_failure_class": "BAIDU_JOB_RUNTIME_ENV_FAILED"}) != "BAIDU_JOB_RUNTIME_ENV_FAILED":
+        raise AssertionError("TERMINAL_DETAIL_PASSTHROUGH_MISMATCH")
     if _runtime_failure_class({"ok": False, "failure_class": "BAIDU_RUNTIME_CUDA_ERROR"}) != "BAIDU_RUNTIME_CUDA_ERROR":
         raise AssertionError("RUNTIME_FAILURE_CLASSIFICATION_MISMATCH")
     if _runtime_failure_class({"ok": True}) is not None:
@@ -126,7 +136,7 @@ def selftest():
     ]:
         if _terminal_failure_class(nonterminal) is not None:
             raise AssertionError("NONTERMINAL_MISCLASSIFIED")
-    print(json.dumps({"ok": True, "suite": "baidu-absolute-startup", "cases": 9, "runtime_candidate": RUNTIME_CANDIDATE, "terminal_fast_exit": True, "runtime_failure_passthrough": True, "status_probe_every_polls": STATUS_PROBE_EVERY_POLLS}))
+    print(json.dumps({"ok": True, "suite": "baidu-absolute-startup", "cases": 10, "runtime_candidate": RUNTIME_CANDIDATE, "terminal_fast_exit": True, "terminal_detail_passthrough": True, "runtime_failure_passthrough": True, "status_probe_every_polls": STATUS_PROBE_EVERY_POLLS}))
     return 0
 
 
