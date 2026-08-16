@@ -6,6 +6,7 @@ const terminal=s=>["completed","failed","cancelled"].includes(String(s||""));
 const now=()=>new Date().toISOString();
 const int=(v,d)=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n):d};
 const SAFE_STAGES=new Set(["circleci_started","aistudio_authenticated","aistudio_submit_returned","baidu_submitted","result_polling","result_retrieved","baidu_terminal_failed"]);
+const SAFE_UPSTREAM_KEYS=new Set(["stage","status","state","jobStatus","pipelineStatus","errorCode","errorMsg","errorMessage","message","reason","failReason","failureReason","exitCode","createTime","updateTime","finishTime","endTime","env","runtime","device","resourceType"]);
 
 function gate(env){return env.CENTER_GATE.get(env.CENTER_GATE.idFromName("global"))}
 async function g(env,p,m="GET",b){const i={method:m,headers:{"content-type":"application/json"}};if(b!==undefined)i.body=JSON.stringify(b);const r=await gate(env).fetch(new Request(`https://gate.internal${p}`,i));return{http:r.status,...await r.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}))}}
@@ -32,6 +33,22 @@ function safeFailureClass(v,error=""){
   const e=String(error||"").toUpperCase();
   const known=["AISTUDIO_AUTH_CLI_NOT_FOUND","AISTUDIO_AUTH_CLI_TIMEOUT","AISTUDIO_AUTH_CLI_FAILED","AISTUDIO_SUBMIT_CLI_NOT_FOUND","AISTUDIO_SUBMIT_CLI_TIMEOUT","AISTUDIO_SUBMIT_CLI_FAILED","BAIDU_JOB_ID_NOT_FOUND","BAIDU_RESULT_TIMEOUT","CALLBACK_HTTP","MISSING_BAIDU_AISTUDIO_ACCESS_TOKEN","MISSING_COMPUTE_CALLBACK_URL","MISSING_BRIDGE_TICKET"];
   return known.find(x=>e.startsWith(x))||"BAIDU_BRIDGE_FAILED";
+}
+function safeDiagString(v){
+  let s=String(v??"").trim().slice(0,240);
+  s=s.replace(/(authorization|access[_-]?key|secret[_-]?key|session[_-]?token|token)\s*[:=]\s*[^\s,;]+/ig,"$1=[REDACTED]");
+  s=s.replace(/\b[A-Za-z0-9_+/=-]{48,}\b/g,"[REDACTED]");
+  return s;
+}
+function safeUpstreamDiagnostic(v){
+  if(!v||typeof v!=="object"||Array.isArray(v))return null;
+  const out={};
+  for(const [k,x] of Object.entries(v)){
+    if(!SAFE_UPSTREAM_KEYS.has(k)||x===null||x===undefined||x==="")continue;
+    if(typeof x==="boolean"||typeof x==="number")out[k]=x;
+    else if(typeof x==="string")out[k]=safeDiagString(x);
+  }
+  return Object.keys(out).length?out:null;
 }
 async function ticketAuthorized(req,task){
   const ticket=String(req.headers.get("x-three-center-bridge-ticket")||"").trim();
@@ -89,11 +106,14 @@ async function callback(req,env){
     await save(env,id,{...common,status:"cancelled",baidu_job_id:job||null,result_discarded:b.result_discarded===true,bridge_ticket_digest:null,finished_at:now()});await release(env,id);return json({ok:true,task_id:id,status:"cancelled"});
   }
   if(status==="failed"){
-    const error=String(b.error||"BAIDU_BRIDGE_FAILED").slice(0,500),failure_class=safeFailureClass(b.failure_class,error);await save(env,id,{...common,status:"failed",baidu_job_id:job||null,error,failure_class,bridge_ticket_digest:null,finished_at:now()});await release(env,id);return json({ok:true,task_id:id,status:"failed",failure_class});
+    const error=String(b.error||"BAIDU_BRIDGE_FAILED").slice(0,500),failure_class=safeFailureClass(b.failure_class,error),upstreamDiagnostic=safeUpstreamDiagnostic(b.upstream_diagnostic);
+    await save(env,id,{...common,status:"failed",baidu_job_id:job||null,error,failure_class,...(upstreamDiagnostic?{upstream_diagnostic:upstreamDiagnostic}:{}),bridge_ticket_digest:null,finished_at:now()});
+    await release(env,id);
+    return json({ok:true,task_id:id,status:"failed",failure_class,...(upstreamDiagnostic?{upstream_diagnostic:upstreamDiagnostic}:{})});
   }
   return err("INVALID_REQUEST","Unsupported callback status",400);
 }
-async function status(req,env){const b=await req.clone().json().catch(()=>({})),id=String(b.task_id||"");if(!id)return null;const t=(await load(env,id)).task;if(!t||t.executor!=="baidu-circleci-cli")return null;if(!internalControl(req))return denyExternalControl();if(terminal(t.status))return json({ok:t.status!=="failed",task_id:id,status:t.status,result_digest:t.result_digest||null,verification:t.verification||null,failure_class:t.failure_class||null,bridge_stage:t.bridge_stage||null,finished_at:t.finished_at||null});return json({ok:true,task_id:id,status:t.status,bridge_stage:t.bridge_stage||null,baidu_job_id_present:Boolean(t.baidu_job_id),circleci_pipeline_id:t.circleci_pipeline_id||null,cancel_requested:t.cancel_requested===true,lock_released:false},202)}
+async function status(req,env){const b=await req.clone().json().catch(()=>({})),id=String(b.task_id||"");if(!id)return null;const t=(await load(env,id)).task;if(!t||t.executor!=="baidu-circleci-cli")return null;if(!internalControl(req))return denyExternalControl();if(terminal(t.status))return json({ok:t.status!=="failed",task_id:id,status:t.status,result_digest:t.result_digest||null,verification:t.verification||null,failure_class:t.failure_class||null,upstream_diagnostic:t.upstream_diagnostic||null,bridge_stage:t.bridge_stage||null,finished_at:t.finished_at||null});return json({ok:true,task_id:id,status:t.status,bridge_stage:t.bridge_stage||null,baidu_job_id_present:Boolean(t.baidu_job_id),circleci_pipeline_id:t.circleci_pipeline_id||null,cancel_requested:t.cancel_requested===true,lock_released:false},202)}
 async function cancel(req,env){const b=await req.clone().json().catch(()=>({})),id=String(b.task_id||"");if(!id)return null;const t=(await load(env,id)).task;if(!t||t.executor!=="baidu-circleci-cli")return null;if(!internalControl(req))return denyExternalControl();if(terminal(t.status))return json({ok:true,task_id:id,status:t.status});await save(env,id,{cancel_requested:true,cancel_requested_at:now(),status:"cancel_requested"});return json({ok:true,task_id:id,status:"cancel_requested",native_cancel:false,bounded_upstream_timeout_seconds:t.manifest?.timeout_seconds||300,lock_retained:true},202)}
 
 export async function maybeHandleBaiduCircleCI(req,env){
