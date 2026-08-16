@@ -9,9 +9,84 @@ import bridge as impl
 import bridge_entry2 as parser_impl
 
 TARGET_RESULT = "three-center-result.json"
+SAFE_DIAGNOSTIC_KEYS = {
+    "stage",
+    "status",
+    "state",
+    "jobStatus",
+    "pipelineStatus",
+    "errorCode",
+    "errorMsg",
+    "errorMessage",
+    "message",
+    "reason",
+    "failReason",
+    "failureReason",
+    "exitCode",
+    "createTime",
+    "updateTime",
+    "finishTime",
+    "endTime",
+    "env",
+    "runtime",
+    "device",
+    "resourceType",
+}
 
 
-def _fail(task_id, stored_job_id, failure_class):
+def _redact_diag_value(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value
+    text = impl.redact_cli(str(value or "")).strip()
+    text = re.sub(
+        r"(?i)(authorization|access[_-]?key|secret[_-]?key|session[_-]?token|token)\s*[:=]\s*[^\s,;]+",
+        r"\1=[REDACTED]",
+        text,
+    )
+    text = re.sub(r"\b[A-Za-z0-9_+/=-]{48,}\b", "[REDACTED]", text)
+    return text[:240]
+
+
+def _safe_pipeline_diagnostic(row):
+    if not isinstance(row, dict):
+        return {}
+    out = {}
+    for key in SAFE_DIAGNOSTIC_KEYS:
+        if key not in row or row.get(key) in (None, ""):
+            continue
+        out[key] = _redact_diag_value(row.get(key))
+    return out
+
+
+def _classify_terminal_diagnostic(diagnostic):
+    if not isinstance(diagnostic, dict):
+        return "BAIDU_JOB_TERMINAL_FAILED"
+    text = " ".join(str(v) for v in diagnostic.values()).lower()
+    if any(x in text for x in ["cancelled", "canceled", "已取消", "取消"]):
+        return "BAIDU_JOB_CANCELLED"
+    if any(x in text for x in ["forbidden", "unauthorized", "permission denied", "权限不足", "无权限", "未授权"]):
+        return "BAIDU_JOB_ACCESS_DENIED"
+    resource_terms = ["insufficient coupon", "insufficient credit", "quota", "resource unavailable", "resource not enough", "余额不足", "算力不足", "算力点不足", "资源不足"]
+    if any(x in text for x in resource_terms):
+        return "BAIDU_JOB_RESOURCE_UNAVAILABLE"
+    runtime_terms = ["runtime", "environment", "image", "镜像", "运行环境", "paddle2.4", "paddle 2.4"]
+    failure_terms = ["failed", "failure", "error", "invalid", "not found", "失败", "错误", "无效", "不存在"]
+    if any(x in text for x in runtime_terms) and any(x in text for x in failure_terms):
+        return "BAIDU_JOB_RUNTIME_ENV_FAILED"
+    command_terms = ["command", "entrypoint", "cmd", "startup", "start command", "启动命令", "启动脚本", "命令"]
+    if any(x in text for x in command_terms) and any(x in text for x in failure_terms):
+        return "BAIDU_JOB_COMMAND_FAILED"
+    if any(x in text for x in ["v100", "gpu"]) and any(x in text for x in ["unavailable", "insufficient", "not available", "资源不足", "不可用"]):
+        return "BAIDU_JOB_GPU_UNAVAILABLE"
+    return "BAIDU_JOB_TERMINAL_FAILED"
+
+
+def _fail(task_id, stored_job_id, failure_class, stage="result_polling", upstream_diagnostic=None):
+    extra = {}
+    if isinstance(upstream_diagnostic, dict) and upstream_diagnostic:
+        extra["upstream_diagnostic"] = upstream_diagnostic
     impl.callback(
         task_id,
         "CHECK",
@@ -19,7 +94,8 @@ def _fail(task_id, stored_job_id, failure_class):
         baidu_job_id=stored_job_id,
         error=failure_class,
         failure_class=failure_class,
-        stage="result_polling",
+        stage=stage,
+        **extra,
     )
     return 2
 
@@ -48,7 +124,15 @@ def _query_pipeline(token, pipeline_id):
     if not row:
         return {"ok": False, "failure_class": "BAIDU_JOB_ID_INVALID_OR_NOT_FOUND"}
     stage = str(row.get("stage") or "")
-    return {"ok": True, "category": _stage_category(stage), "pipeline_id": str(row.get("pipelineId") or pipeline_id)}
+    category = _stage_category(stage)
+    diagnostic = _safe_pipeline_diagnostic(row)
+    return {
+        "ok": True,
+        "category": category,
+        "pipeline_id": str(row.get("pipelineId") or pipeline_id),
+        "diagnostic": diagnostic,
+        "terminal_failure_class": _classify_terminal_diagnostic(diagnostic) if category == "terminal_failed" else None,
+    }
 
 
 def _select_pipeline_row(rows, expected_name):
@@ -74,15 +158,11 @@ def _resolve_pipeline_by_name(token, task_id):
         return {"ok": False, "failure_class": "BAIDU_PIPELINE_NAME_INVALID"}
     try:
         from aistudio_sdk.requests import pipeline as pp_request
-        # First use the documented name filter.
         rows = _query_rows(pp_request, token, expected_name)
         if rows is None:
             return {"ok": False, "failure_class": "BAIDU_PIPELINE_RECOVERY_API_ERROR"}
         row = _select_pipeline_row(rows, expected_name)
         if not row:
-            # Zero-GPU fallback: query the visible pipeline list without a name
-            # filter and perform the exact match locally. This distinguishes a
-            # broken server-side name filter from a genuinely absent submit.
             all_rows = _query_rows(pp_request, token, "")
             if all_rows is None:
                 return {"ok": False, "failure_class": "BAIDU_PIPELINE_GLOBAL_QUERY_API_ERROR"}
@@ -92,7 +172,15 @@ def _resolve_pipeline_by_name(token, task_id):
     if not row:
         return {"ok": False, "failure_class": "BAIDU_PIPELINE_ABSENT_AFTER_GLOBAL_QUERY"}
     pid = str(row.get("pipelineId") or "").strip()
-    return {"ok": True, "pipeline_id": pid, "category": _stage_category(row.get("stage"))}
+    category = _stage_category(row.get("stage"))
+    diagnostic = _safe_pipeline_diagnostic(row)
+    return {
+        "ok": True,
+        "pipeline_id": pid,
+        "category": category,
+        "diagnostic": diagnostic,
+        "terminal_failure_class": _classify_terminal_diagnostic(diagnostic) if category == "terminal_failed" else None,
+    }
 
 
 def _list_output(token, pipeline_id):
@@ -143,14 +231,21 @@ def diagnostic_check(task_id, stored_job_id):
             return _fail(task_id, stored_job_id, recovery["failure_class"])
         active_pipeline_id = recovery["pipeline_id"]
         recovered = active_pipeline_id != stored_job_id
-        q = {"ok": True, "category": recovery.get("category", "unknown"), "pipeline_id": active_pipeline_id}
+        q = recovery
     elif not q.get("ok"):
         return _fail(task_id, stored_job_id, q["failure_class"])
 
     if q.get("category") == "not_finished":
-        return _fail(task_id, stored_job_id, "BAIDU_JOB_NOT_FINISHED")
+        return _fail(task_id, stored_job_id, "BAIDU_JOB_NOT_FINISHED", upstream_diagnostic=q.get("diagnostic"))
     if q.get("category") == "terminal_failed":
-        return _fail(task_id, stored_job_id, "BAIDU_JOB_TERMINAL_FAILED")
+        failure_class = str(q.get("terminal_failure_class") or "BAIDU_JOB_TERMINAL_FAILED")
+        return _fail(
+            task_id,
+            stored_job_id,
+            failure_class,
+            stage="baidu_terminal_failed",
+            upstream_diagnostic=q.get("diagnostic"),
+        )
 
     listing = _list_output(token, active_pipeline_id)
     if not listing.get("ok"):
@@ -194,7 +289,23 @@ def selftest():
     picked = _select_pipeline_row(rows, name)
     if not picked or str(picked.get("pipelineId")) != "333":
         raise AssertionError("PIPELINE_NAME_RECOVERY_SELECTION_FAILED")
-    print(json.dumps({"ok": True, "suite": "baidu-status-output-diagnostic-v3", "cases": len(cases) + 1, "global_lookup": True}))
+    sample = {
+        "pipelineId": "secret-job-id",
+        "pipelineName": "should-not-leak",
+        "stage": "failed",
+        "errorCode": 12001,
+        "errorMessage": "runtime image failed token=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+        "runtime": "paddle2.4_py3.7",
+        "secretAccessKey": "must-not-leak",
+    }
+    safe = _safe_pipeline_diagnostic(sample)
+    if "pipelineId" in safe or "pipelineName" in safe or "secretAccessKey" in safe:
+        raise AssertionError("DIAGNOSTIC_ALLOWLIST_FAILED")
+    if "[REDACTED]" not in str(safe.get("errorMessage")):
+        raise AssertionError("DIAGNOSTIC_REDACTION_FAILED")
+    if _classify_terminal_diagnostic(safe) != "BAIDU_JOB_RUNTIME_ENV_FAILED":
+        raise AssertionError("TERMINAL_DETAIL_CLASSIFICATION_FAILED")
+    print(json.dumps({"ok": True, "suite": "baidu-status-output-diagnostic-v4", "cases": len(cases) + 4, "global_lookup": True, "safe_terminal_diagnostic": True, "diagnostic_allowlist": True}))
     return 0
 
 

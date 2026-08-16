@@ -55,7 +55,8 @@ assert.doesNotMatch(bridge,/"--payment", "acoin"/);
 assert.match(bridge,/STATUS_PROBE_EVERY_POLLS = 2/);
 assert.match(bridge,/check_impl\._query_pipeline\(token, job_id\)/);
 assert.match(bridge,/BAIDU_JOB_TERMINAL_FAILED/);
-assert.match(bridge,/stage="baidu_terminal_failed"/);
+assert.match(bridge,/terminal_failure_class/);
+assert.match(bridge,/upstream_diagnostic/);
 assert.match(bridge,/_runtime_failure_class\(result\)/);
 assert.match(bridge,/BAIDU_RUNTIME_EXECUTION_ERROR/);
 
@@ -69,5 +70,6 @@ assert.match(router,/V100_RUNTIME_ATTESTATION_FAILED/);
 assert.match(router,/\/v100\/i\.test\(String\(r\.gpu_name/);
 assert.match(router,/r\.paddle_cuda!==true/);
 assert.match(router,/"baidu_terminal_failed"/);
+assert.match(router,/safeUpstreamDiagnostic/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,route_requires_live_health:true,baidu_candidate:"paddle2.4_py3.7",baidu_p25_quarantined:true,baidu_p26_quarantined:true,automatic_candidate_execution:false,baidu_e2e_gate_preserved:true,baidu_terminal_fast_exit:true,baidu_runtime_v100_attestation:true,runtime_failure_passthrough:true}));
+console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,route_requires_live_health:true,baidu_candidate:"paddle2.4_py3.7",baidu_p25_quarantined:true,baidu_p26_quarantined:true,automatic_candidate_execution:false,baidu_e2e_gate_preserved:true,baidu_terminal_fast_exit:true,baidu_terminal_detail_passthrough:true,baidu_runtime_v100_attestation:true,runtime_failure_passthrough:true}));
