@@ -14,6 +14,7 @@ export const AUTONOMY_POLICY=Object.freeze({
   retry_policy:"bounded-no-loop",
   runtime_upgrade_policy:"candidate-canary-promote",
   production_upgrade_policy:"keep-last-verified-until-candidate-pass",
+  route_requires_live_health:true,
   notify_user_only_for:["ALL_VERIFIED_PROVIDERS_UNAVAILABLE","AUTH_REQUIRES_HUMAN","TERMS_OR_REALNAME_ACTION_REQUIRED","FREE_TIER_REMOVED_OR_BILLING_REQUIRED"]
 });
 
@@ -77,8 +78,8 @@ function freeGuard(id,meta,health){
   return false;
 }
 function accepted(id,meta,health){
-  if(id==="kaggle")return meta?.business_e2e===true&&health?.business_e2e===true;
-  if(id==="modal")return meta?.route_eligible===true&&meta?.acceptance_state==="cpu-t4-e2e-verified";
+  if(id==="kaggle")return meta?.business_e2e===true&&health?.business_e2e===true&&health?.route_eligible===true;
+  if(id==="modal")return meta?.historically_verified===true&&meta?.acceptance_state==="cpu-t4-e2e-verified"&&health?.ok===true&&health?.route_eligible===true;
   if(id==="baidu")return meta?.e2e_verified===true&&meta?.route_eligible===true;
   return false;
 }
@@ -104,6 +105,7 @@ async function observe(app,env,ctx,id){
   const healthResponse=def.health?await call(app,def.health,env,ctx):metaResponse;
   const meta=metaResponse.body||{},health=healthResponse.body||{};
   const cfg=configured(id,meta,health),free=freeGuard(id,meta,health),acc=accepted(id,meta,health);
+  const routeEligible=id==="modal"||id==="kaggle"?health.route_eligible===true:meta.route_eligible===true;
   return{
     configured:cfg,
     free_guard_ok:free,
@@ -111,8 +113,8 @@ async function observe(app,env,ctx,id){
     probe_ok:metaResponse.ok&&healthResponse.ok,
     meta_http_status:metaResponse.http_status,
     health_http_status:healthResponse.http_status,
-    acceptance_state:String(meta.acceptance_state||health.acceptance_state||"unknown").slice(0,80),
-    route_eligible:meta.route_eligible===true,
+    acceptance_state:String(health.acceptance_state||meta.acceptance_state||"unknown").slice(0,80),
+    route_eligible:routeEligible,
     e2e_verified:id==="baidu"?meta.e2e_verified===true:acc,
     free_only:true,
     paid_fallback:false,
@@ -128,7 +130,7 @@ export async function runAutonomySweep(app,env,ctx){
     const next=transition(id,previous,observation);
     const record={...next,observation,last_checked_at:observation.checked_at,last_success_at:next.state==="VERIFIED"?observation.checked_at:(previous?.last_success_at||null),last_failure_at:["DEGRADED","QUARANTINED"].includes(next.state)?observation.checked_at:(previous?.last_failure_at||null),free_only:true,paid_fallback:false,user_action_required:false};
     await save(env,id,record);
-    results.push({provider:id,state:record.state,reason:record.reason,free_only:true,paid_fallback:false});
+    results.push({provider:id,state:record.state,reason:record.reason,route_eligible:observation.route_eligible,free_only:true,paid_fallback:false});
   }
   return{ok:true,policy:AUTONOMY_POLICY.schema,checked_at:now(),providers:results,gpu_canary_started:false,user_action_required:false};
 }
@@ -137,7 +139,7 @@ export async function getAutonomySnapshot(env){
   const providers=[];
   for(const id of PROVIDER_IDS){
     const rec=await load(env,id);
-    providers.push(rec?{provider:id,state:rec.state||"CANDIDATE",reason:rec.reason||null,consecutive_failures:int(rec.consecutive_failures),consecutive_successes:int(rec.consecutive_successes),last_checked_at:rec.last_checked_at||null,last_success_at:rec.last_success_at||null,last_failure_at:rec.last_failure_at||null,free_only:true,paid_fallback:false}:{provider:id,state:"CANDIDATE",reason:"AWAITING_FIRST_AUTONOMY_SWEEP",consecutive_failures:0,consecutive_successes:0,last_checked_at:null,last_success_at:null,last_failure_at:null,free_only:true,paid_fallback:false});
+    providers.push(rec?{provider:id,state:rec.state||"CANDIDATE",reason:rec.reason||null,route_eligible:rec.observation?.route_eligible===true,consecutive_failures:int(rec.consecutive_failures),consecutive_successes:int(rec.consecutive_successes),last_checked_at:rec.last_checked_at||null,last_success_at:rec.last_success_at||null,last_failure_at:rec.last_failure_at||null,free_only:true,paid_fallback:false}:{provider:id,state:"CANDIDATE",reason:"AWAITING_FIRST_AUTONOMY_SWEEP",route_eligible:false,consecutive_failures:0,consecutive_successes:0,last_checked_at:null,last_success_at:null,last_failure_at:null,free_only:true,paid_fallback:false});
   }
   return{ok:true,policy:AUTONOMY_POLICY,baidu_runtime_policy:BAIDU_RUNTIME_POLICY,providers,user_routine_maintenance_required:false};
 }
