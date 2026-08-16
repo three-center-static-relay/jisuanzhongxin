@@ -6,6 +6,6 @@ try{
   const b=await r.json();
   assert.equal(r.status,200);
   assert.equal(b.status,"failed");
-  assert.match(String(b.failure_class||""),/^DIAGNOSTIC_/);
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24-failure-prefix-diagnostic",diagnostic_failure:true,network:true}));
+  assert.ok(["BAIDU_JOB_RESOURCE_UNAVAILABLE","BAIDU_JOB_ACCESS_DENIED","BAIDU_JOB_CANCELLED"].includes(String(b.failure_class||"")));
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24-failure-group-resource-access-cancel",matched:true,network:true}));
 }finally{clearTimeout(timer)}
