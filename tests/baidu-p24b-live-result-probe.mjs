@@ -13,6 +13,7 @@ try{
   assert.equal(b.task.task_id,"baidu-circleci-live-20260816p24b");
   assert.ok(["completed","failed","cancelled"].includes(String(b.task.status||"")));
   assert.equal(b.task.production_promoted,false);
-  assert.equal(typeof b.ok,"boolean");
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-result-probe",terminal:true,sanitized:true}));
+  assert.equal(b.ok,true);
+  assert.equal(b.task.status,"completed");
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-result-probe",terminal:true,completed:true,sanitized:true}));
 }finally{clearTimeout(timer)}
