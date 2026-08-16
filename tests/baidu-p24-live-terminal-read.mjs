@@ -9,5 +9,10 @@ try{
   assert.equal(b.read_only,true);
   assert.equal(b.operation,"CHECK");
   assert.equal(b.gpu_submit,false);
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24-http-200-terminal",http_status:200,terminal:true,network:true}));
+  assert.equal(b.status,"failed");
+  assert.match(String(b.failure_class||""),/^(BAIDU|DIAGNOSTIC)_[A-Z0-9_]{3,80}$/);
+  assert.equal(b.secrets_redacted,true);
+  assert.equal(b.source_job_id_exposed,false);
+  assert.equal(b.result_body_exposed,false);
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24-terminal-failed",status:"failed",failure_class_present:true,upstream_diagnostic_present:Boolean(b.upstream_diagnostic),network:true}));
 }finally{clearTimeout(timer)}
