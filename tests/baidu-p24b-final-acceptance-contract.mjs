@@ -4,6 +4,7 @@ import {baiduCircleCIMeta} from "../src/baidu-circleci.js";
 
 const wrapper=fs.readFileSync(new URL("../src/production-entry-baidu-p24b-e2e.js",import.meta.url),"utf8");
 const admin=fs.readFileSync(new URL("../src/admin-entry.js",import.meta.url),"utf8");
+const sdkWrapper=fs.readFileSync(new URL("../src/production-entry-baidu-sdk039-selftest.js",import.meta.url),"utf8");
 const bridge=fs.readFileSync(new URL("../bridge/baidu/bridge_entry9.py",import.meta.url),"utf8");
 const wrangler=fs.readFileSync(new URL("../wrangler.jsonc",import.meta.url),"utf8");
 
@@ -32,12 +33,18 @@ assert.match(wrapper,/ACCEPTANCE_EXPIRES_AT=Date\.parse\("2026-08-16T12:30:00Z"\
 assert.match(wrapper,/baidu_job_id_present:Boolean/);
 assert.doesNotMatch(wrapper,/baidu_job_id:t\.baidu_job_id/);
 
-assert.match(admin,/from "\.\/production-entry\.js"/);
+assert.match(admin,/production-entry-baidu-sdk039-selftest\.js/);
+assert.match(admin,/SELFTEST_PATH/);
 assert.doesNotMatch(admin,/production-entry-baidu-p24b-e2e\.js/);
 assert.doesNotMatch(admin,/P24B_TRIGGER_CRON/);
 assert.doesNotMatch(admin,/P24B_ACCEPTANCE_PATH/);
-assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
-assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
+assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*",\s*"\* \* \* \* \*"\]\s*\}/);
+assert.match(sdkWrapper,/op:"SDK_SELFTEST"/);
+assert.match(sdkWrapper,/gpu:false/);
+assert.match(sdkWrapper,/compute_credit_used:false/);
+assert.doesNotMatch(sdkWrapper,/op:"SUBMIT"/);
+assert.doesNotMatch(sdkWrapper,/device:"v100"/);
+assert.doesNotMatch(sdkWrapper,/payment:"coupon"/);
 
 assert.match(bridge,/BOOTSTRAP_SCHEMA = "baidu-bootstrap-sentinel-v1"/);
 assert.match(bridge,/BOOTSTRAP_COMMAND = "sh \/home\/aistudio\/bootstrap\.sh"/);
@@ -46,4 +53,4 @@ assert.match(bridge,/"--gpus", "1"/);
 assert.match(bridge,/"--payment", "coupon"/);
 assert.doesNotMatch(bridge,/"--payment", "acoin"/);
 
-console.log(JSON.stringify({ok:true,suite:"baidu-p24b-final-acceptance-contract",runtime:"paddle2.4_py3.7",p24b_result:"failed",failure_class:"BAIDU_JOB_TERMINAL_FAILED",bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",candidate_state:"QUARANTINED",live_e2e_failures:2,production_runtime:null,route_eligible:false,automatic_retry:false,expired_trigger_removed:true}));
+console.log(JSON.stringify({ok:true,suite:"baidu-p24b-final-acceptance-contract",runtime:"paddle2.4_py3.7",p24b_result:"failed",failure_class:"BAIDU_JOB_TERMINAL_FAILED",bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",candidate_state:"QUARANTINED",live_e2e_failures:2,production_runtime:null,route_eligible:false,automatic_retry:false,p24b_trigger_removed:true,temporary_sdk039_probe_zero_gpu:true}));
