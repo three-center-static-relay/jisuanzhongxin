@@ -1,4 +1,4 @@
-import app,{CenterGate} from "./production-entry-baidu-sdk039-selftest.js";
+import app,{CenterGate} from "./production-entry.js";
 import {getAutonomySnapshot,runAutonomySweep} from "./provider-autonomy.js";
 export {CenterGate};
 
