@@ -1,7 +1,6 @@
 import production,{CenterGate} from "./production.js";
 import {maybeHandleBaiduCircleCI} from "./baidu-circleci-router.js";
 import {maybeHandleModels} from "./model-router.js";
-import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {medicalImagingMeta} from "./medical-imaging-toolkit.js";
 import {chooseModalAccelerator,modalCpuSelftest,modalGpuSelftest,modalHealth,modalMeta} from "./modal.js";
 import {modalBoundedCompute} from "./modal-generic-compute.js";
@@ -46,8 +45,6 @@ export default {
       return Response.json(p,{status:p.ok?200:503,headers:{"cache-control":"no-store"}});
     }
     req=await normalizeMedicalImagingRequest(req);
-    const benchmarkHandled=await maybeHandleBenchmarks(req);
-    if(benchmarkHandled)return benchmarkHandled;
     const modelHandled=await maybeHandleModels(req,env);
     if(modelHandled)return modelHandled;
     const handled=await maybeHandleBaiduCircleCI(req,env);
