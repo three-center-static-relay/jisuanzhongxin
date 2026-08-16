@@ -4,6 +4,8 @@ export {CenterGate};
 
 const ORIGIN="https://compute.internal";
 const SERVICE="compute-worker";
+const P25_ACCEPTANCE_PATH="/__acceptance/baidu-v100-p25-20260816-a91d7f3c2b6e4a58d04c8f1e7b9a3d62";
+const P25_TRIGGER_CRON="* * * * *";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
 async function readApp(path,env,ctx){
@@ -58,6 +60,10 @@ export default{
     return app.fetch(req,env,ctx);
   },
   async scheduled(controller,env,ctx){
+    if(String(controller?.cron||"")===P25_TRIGGER_CRON){
+      ctx.waitUntil(app.fetch(new Request(`${ORIGIN}${P25_ACCEPTANCE_PATH}`,{method:"GET"}),env,ctx));
+      return;
+    }
     ctx.waitUntil(runAutonomySweep(app,env,ctx));
   }
 };
