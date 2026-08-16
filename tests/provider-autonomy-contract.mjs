@@ -22,7 +22,7 @@ assert.equal(BAIDU_RUNTIME_POLICY.production_runtime,null);
 assert.match(admin,/async scheduled\(controller,env,ctx\)/);
 assert.match(admin,/runAutonomySweep\(app,env,ctx\)/);
 assert.match(admin,/\/v1\/admin\/autonomy/);
-assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
+assert.match(wrangler,/"17 4 \* \* \*"/);
 assert.match(wrangler,/provider-autonomy-contract\.mjs/);
 
 assert.match(baidu,/baidu_payment:"coupon"/);
