@@ -4,6 +4,6 @@ const r=await fetch(url,{headers:{accept:"application/json"}});const b=await r.j
 assert.equal(b.diagnostic,true);
 assert.equal(b.task_id,"baidu-circleci-live-20260816p24a");
 assert.equal(b.status,"failed");
-assert.match(String(b.failure_class||""),/^[A-Z0-9_]{3,80}$/);
+assert.equal(b.failure_class,"BAIDU_JOB_TERMINAL_FAILED");
 assert.equal(b.production_ready,false);
-console.log(JSON.stringify({ok:true,suite:"baidu-p24-classify-failed",failure_class:b.failure_class}));
+console.log(JSON.stringify({ok:true,suite:"baidu-p24-classify-terminal-job-failed",failure_class:"BAIDU_JOB_TERMINAL_FAILED"}));
