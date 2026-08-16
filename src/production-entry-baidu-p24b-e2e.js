@@ -4,8 +4,9 @@ export {CenterGate};
 
 const TASK_ID="baidu-circleci-live-20260816p24b";
 const ACCEPTANCE_PATH="/__acceptance/baidu-v100-p24b-20260816-4bcb46c4f3d64a27a1b869243171e4aa";
-const STATUS_PATH="/__diagnostic/baidu-v100-p24b-20260816-8f1a0df2c7674ea6b33798bd56f2cd42";
-const EXPIRES_AT=Date.parse("2026-08-16T12:30:00Z");
+const STATUS_PATH="/__diagnostic/baidu-v100-p24b-result-20260816-ae9f40a8b99d43d9a28df1fcbf2ab7f4";
+const ACCEPTANCE_EXPIRES_AT=Date.parse("2026-08-16T12:30:00Z");
+const DIAGNOSTIC_EXPIRES_AT=Date.parse("2026-08-16T13:30:00Z");
 const RUNTIME="paddle2.4_py3.7";
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
 const now=()=>new Date().toISOString();
@@ -42,7 +43,7 @@ async function start(env){
 async function acceptance(req,env){
   const u=new URL(req.url);
   if(u.pathname===STATUS_PATH){
-    if(Date.now()>EXPIRES_AT)return json({ok:false,error:"DIAGNOSTIC_EXPIRED",diagnostic:true},410);
+    if(Date.now()>DIAGNOSTIC_EXPIRES_AT)return json({ok:false,error:"DIAGNOSTIC_EXPIRED",diagnostic:true},410);
     if(req.method!=="GET")return json({ok:false,error:"METHOD_NOT_ALLOWED"},405);
     const current=(await load(env)).task;
     if(!current)return json({ok:false,error:"TASK_NOT_FOUND",diagnostic:true,task_id:TASK_ID},404);
@@ -51,7 +52,7 @@ async function acceptance(req,env){
   }
   if(u.pathname!==ACCEPTANCE_PATH)return null;
   if(u.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"Baidu acceptance trigger is service-binding internal only"},403);
-  if(Date.now()>EXPIRES_AT)return json({ok:false,error:"ACCEPTANCE_ROUTE_EXPIRED"},410);
+  if(Date.now()>ACCEPTANCE_EXPIRES_AT)return json({ok:false,error:"ACCEPTANCE_ROUTE_EXPIRED"},410);
   if(req.method!=="GET")return json({ok:false,error:"METHOD_NOT_ALLOWED"},405);
   const current=(await load(env)).task;
   if(current)return json({ok:current.status!=="failed",already_started:true,task:safeTask(current)},current.status==="completed"?200:current.status==="failed"?502:202);
