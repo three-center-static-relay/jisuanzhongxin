@@ -21,6 +21,20 @@ export const AUTONOMY_POLICY=Object.freeze({
 export const BAIDU_RUNTIME_POLICY=Object.freeze({
   sdk:"aistudio-sdk==0.3.8",
   sdk_upgrade_candidate:"aistudio-sdk==0.3.9",
+  sdk_candidate_probe:"circleci-control-plane-live-verified",
+  sdk_candidate_control_plane_verified:true,
+  sdk_candidate_control_plane_evidence:{
+    task_id:"baidu-sdk039-control-plane-20260816c",
+    state:"completed",
+    sdk_selftest_passed:true,
+    terminal_callback_received:true,
+    gpu_submitted:false,
+    compute_credit_used:false,
+    production_promoted:false,
+    verified_at:"2026-08-16T23:53:42Z",
+    verification_transport:"cloudflare-build-live-status-probe"
+  },
+  sdk_candidate_gpu_verified:false,
   sdk_upgrade_for_diagnostics:false,
   diagnostic_surface:"pipeline-query-stage-plus-bootstrap-sentinel",
   public_callable_log_detail_info:{"0.3.8":false,"0.3.9":false},
@@ -53,7 +67,7 @@ export const BAIDU_RUNTIME_POLICY=Object.freeze({
   fallback_candidates:[],
   automatic_candidate_execution:false,
   automatic_same_failure_retry:false,
-  candidate_retest_policy:"blocked-until-upstream-runtime-change",
+  candidate_retest_policy:"single-sdk039-p24-canary-allowed-after-control-plane-pass",
   promotion_requires:["live_e2e","v100_cuda_verified","result_digest","bridge_result_retrieved"]
 });
 
