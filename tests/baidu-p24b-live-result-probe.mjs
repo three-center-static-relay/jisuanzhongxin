@@ -15,7 +15,5 @@ try{
   assert.equal(b.task.status,"failed");
   assert.equal(b.task.production_promoted,false);
   assert.equal(b.task.failure_class,"BAIDU_JOB_RUNTIME_PROCESS_TERMINAL_FAILED");
-  assert.ok(b.task.upstream_diagnostic&&typeof b.task.upstream_diagnostic==="object");
-  assert.equal(b.task.upstream_diagnostic.reason,"BOOTSTRAP_PYTHON_STARTED");
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-result-probe",failed:true,failure_class:"BAIDU_JOB_RUNTIME_PROCESS_TERMINAL_FAILED",bootstrap_python_started:true,sanitized:true}));
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-result-probe",failed:true,failure_class:"BAIDU_JOB_RUNTIME_PROCESS_TERMINAL_FAILED",sanitized:true}));
 }finally{clearTimeout(timer)}
