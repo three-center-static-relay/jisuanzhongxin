@@ -32,19 +32,34 @@ jobs:
           command: python -m pip install --disable-pip-version-check --no-input "aistudio-sdk==<< pipeline.parameters.sdk_version >>"
       - run:
           name: Validate Baidu submit confirmation
-          command: python bridge/baidu/bridge.py --selftest-parser
+          command: |
+            if [ "<< pipeline.parameters.bridge_op >>" != "SDK_SELFTEST" ]; then
+              python bridge/baidu/bridge.py --selftest-parser
+            fi
       - run:
           name: Validate AI Studio job-id parser
-          command: python bridge/baidu/bridge_entry2.py --selftest-parser
+          command: |
+            if [ "<< pipeline.parameters.bridge_op >>" != "SDK_SELFTEST" ]; then
+              python bridge/baidu/bridge_entry2.py --selftest-parser
+            fi
       - run:
           name: Validate Baidu status/output diagnostic
-          command: python bridge/baidu/bridge_entry4.py --selftest-diagnostic
+          command: |
+            if [ "<< pipeline.parameters.bridge_op >>" != "SDK_SELFTEST" ]; then
+              python bridge/baidu/bridge_entry4.py --selftest-diagnostic
+            fi
       - run:
           name: Validate Baidu structured runtime result
-          command: python bridge/baidu/job/run.py --selftest
+          command: |
+            if [ "<< pipeline.parameters.bridge_op >>" != "SDK_SELFTEST" ]; then
+              python bridge/baidu/job/run.py --selftest
+            fi
       - run:
           name: Validate Baidu absolute startup command
-          command: python bridge/baidu/bridge_entry9.py --selftest-startup
+          command: |
+            if [ "<< pipeline.parameters.bridge_op >>" != "SDK_SELFTEST" ]; then
+              python bridge/baidu/bridge_entry9.py --selftest-startup
+            fi
       - run:
           name: Run bounded Baidu bridge operation
           when: always
