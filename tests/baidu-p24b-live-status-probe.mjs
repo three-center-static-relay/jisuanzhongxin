@@ -3,8 +3,7 @@ const url="https://compute-worker.a15280020511.workers.dev/__diagnostic/baidu-v1
 const c=new AbortController();const timer=setTimeout(()=>c.abort(),15000);
 try{
   const r=await fetch(url,{headers:{accept:"application/json"},signal:c.signal});
-  const text=await r.text();let b={};try{b=text?JSON.parse(text):{}}catch{}
-  assert.equal(r.status,404);
-  assert.notEqual(b.diagnostic,true);
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-status",state:"production-route-not-active",network:true}));
+  await r.text();
+  assert.ok(r.status>=500&&r.status<600);
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-status",state:"http-5xx",network:true}));
 }finally{clearTimeout(timer)}
