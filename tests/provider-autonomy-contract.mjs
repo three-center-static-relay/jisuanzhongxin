@@ -9,6 +9,7 @@ const baidu=read("../src/baidu-circleci.js");
 const router=read("../src/baidu-circleci-router.js");
 const bridge=read("../bridge/baidu/bridge_entry9.py");
 const runtime=read("../bridge/baidu/job/run.py");
+const sdkProbe=read("../bridge/baidu/sdk_selftest.py");
 const wrangler=read("../wrangler.jsonc");
 
 for(const state of ["VERIFIED","DEGRADED","QUARANTINED","CANDIDATE","DISABLED"])assert.match(autonomy,new RegExp(`"${state}"`));
@@ -44,20 +45,28 @@ assert.equal(BAIDU_RUNTIME_POLICY.quarantine_evidence["paddle2.5_py3.10"].live_e
 
 assert.match(admin,/async scheduled\(controller,env,ctx\)/);
 assert.match(admin,/runAutonomySweep\(app,env,ctx\)/);
-assert.match(admin,/from "\.\/production-entry\.js"/);
+assert.match(admin,/production-entry-baidu-sdk039-selftest\.js/);
+assert.match(admin,/SELFTEST_PATH/);
+assert.match(admin,/"\* \* \* \* \*"/);
 assert.doesNotMatch(admin,/P24B_TRIGGER_CRON/);
 assert.doesNotMatch(admin,/production-entry-baidu-p24b-e2e\.js/);
 assert.doesNotMatch(admin,/P25B_TRIGGER_CRON/);
-assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
+assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*",\s*"\* \* \* \* \*"\]\s*\}/);
 assert.match(wrangler,/baidu-p24b-final-acceptance-contract\.mjs/);
+assert.match(wrangler,/baidu-sdk039-selftest-contract\.mjs/);
 assert.doesNotMatch(wrangler,/baidu-p25b-canary-contract\.mjs/);
 
 assert.match(autonomy,/health\?\.route_eligible===true/);
 assert.match(autonomy,/meta\?\.historically_verified===true/);
 assert.match(autonomy,/route_eligible:routeEligible/);
 
-for(const pattern of [/baidu_payment:"coupon"/,/free_only:true/,/paid_fallback:false/,/acoin_allowed:false/,/sdk_pinned:"aistudio-sdk==0\.3\.8"/,/runtime_candidate:"paddle2\.4_py3\.7"/,/runtime_candidate_state:"QUARANTINED"/,/live_e2e_failures:2/,/latest_bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE"/,/automatic_candidate_execution:false/,/automatic_same_failure_retry:false/,/candidate_retest_policy:"blocked-until-upstream-runtime-change"/,/route_eligible:configured&&e2eVerified/])assert.match(baidu,pattern);
+for(const pattern of [/baidu_payment:"coupon"/,/free_only:true/,/paid_fallback:false/,/acoin_allowed:false/,/sdk_pinned:"aistudio-sdk==0\.3\.8"/,/sdk_upgrade_candidate:"aistudio-sdk==0\.3\.9"/,/sdk_candidate_gpu_submission:false/,/runtime_candidate:"paddle2\.4_py3\.7"/,/runtime_candidate_state:"QUARANTINED"/,/live_e2e_failures:2/,/latest_bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE"/,/automatic_candidate_execution:false/,/automatic_same_failure_retry:false/,/candidate_retest_policy:"blocked-until-upstream-runtime-change"/,/route_eligible:configured&&e2eVerified/])assert.match(baidu,pattern);
 assert.doesNotMatch(baidu,/acoin_allowed:true/);
+
+assert.match(sdkProbe,/EXPECTED_VERSION = "0\.3\.9"/);
+assert.match(sdkProbe,/"gpu_submitted": False/);
+assert.match(sdkProbe,/"compute_credit_used": False/);
+assert.doesNotMatch(sdkProbe,/submit\s+job/i);
 
 assert.match(bridge,/RUNTIME_CANDIDATE = "paddle2\.4_py3\.7"/);
 assert.match(bridge,/BOOTSTRAP_SCHEMA = "baidu-bootstrap-sentinel-v1"/);
@@ -77,4 +86,4 @@ assert.match(runtime,/"paddle_cuda": paddle_cuda/);
 assert.match(router,/V100_RUNTIME_ATTESTATION_FAILED/);
 assert.match(router,/safeUpstreamDiagnostic/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,p24b_trigger_removed:true,route_requires_live_health:true,baidu_last_candidate:"paddle2.4_py3.7",baidu_candidate_state:"QUARANTINED",live_e2e_failures:2,automatic_candidate_execution:false,automatic_same_failure_retry:false,production_runtime:null,bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE"}));
+console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,temporary_sdk039_control_plane_probe:true,p24b_trigger_removed:true,route_requires_live_health:true,baidu_last_candidate:"paddle2.4_py3.7",baidu_candidate_state:"QUARANTINED",live_e2e_failures:2,automatic_candidate_execution:false,automatic_same_failure_retry:false,production_runtime:null,bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",sdk039_gpu_submitted:false}));

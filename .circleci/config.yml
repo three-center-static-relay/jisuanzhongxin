@@ -16,6 +16,9 @@ parameters:
   bridge_ticket:
     type: string
     default: ""
+  sdk_version:
+    type: string
+    default: "0.3.8"
 
 jobs:
   baidu-cli-bridge:
@@ -25,8 +28,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install pinned official AI Studio SDK
-          command: python -m pip install --disable-pip-version-check --no-input "aistudio-sdk==0.3.8"
+          name: Install selected official AI Studio SDK
+          command: python -m pip install --disable-pip-version-check --no-input "aistudio-sdk==<< pipeline.parameters.sdk_version >>"
       - run:
           name: Validate Baidu submit confirmation
           command: python bridge/baidu/bridge.py --selftest-parser
@@ -43,7 +46,7 @@ jobs:
           name: Validate Baidu absolute startup command
           command: python bridge/baidu/bridge_entry9.py --selftest-startup
       - run:
-          name: Run bounded Baidu CLI bridge
+          name: Run bounded Baidu bridge operation
           when: always
           no_output_timeout: 10m
           environment:
@@ -51,7 +54,12 @@ jobs:
             BRIDGE_TASK_ID: << pipeline.parameters.task_id >>
             BRIDGE_BAIDU_JOB_ID: << pipeline.parameters.baidu_job_id >>
             BRIDGE_TICKET: << pipeline.parameters.bridge_ticket >>
-          command: python bridge/baidu/bridge_entry9.py
+          command: |
+            if [ "<< pipeline.parameters.bridge_op >>" = "SDK_SELFTEST" ]; then
+              python bridge/baidu/sdk_selftest.py
+            else
+              python bridge/baidu/bridge_entry9.py
+            fi
 
 workflows:
   baidu-cli-bridge:

@@ -1,5 +1,5 @@
 const CIRCLE_API="https://circleci.com/api/v2";
-const ALLOWED_OPS=new Set(["SUBMIT","CHECK","FETCH","CANCEL"]);
+const ALLOWED_OPS=new Set(["SUBMIT","CHECK","FETCH","CANCEL","SDK_SELFTEST"]);
 const PRODUCTION_RUNTIME=null;
 const encSlug=s=>String(s||"").split("/").map(encodeURIComponent).join("/");
 const str=(v)=>String(v||"").trim();
@@ -20,7 +20,7 @@ export function baiduCircleCIMeta(env={}){
     route_eligible:configured&&e2eVerified,
     trigger:"circleci-api-v2",
     executor:"docker-python",
-    allowed_operations:["SUBMIT","CHECK","FETCH","CANCEL"],
+    allowed_operations:["SUBMIT","CHECK","FETCH","CANCEL","SDK_SELFTEST"],
     baidu_payment:"coupon",
     free_only:true,
     paid_fallback:false,
@@ -29,6 +29,8 @@ export function baiduCircleCIMeta(env={}){
     baidu_gpus:1,
     sdk_pinned:"aistudio-sdk==0.3.8",
     sdk_upgrade_candidate:"aistudio-sdk==0.3.9",
+    sdk_candidate_probe:"circleci-control-plane-only",
+    sdk_candidate_gpu_submission:false,
     sdk_upgrade_for_diagnostics:false,
     diagnostic_surface:"pipeline-query-stage-plus-bootstrap-sentinel",
     public_callable_log_detail_info:{"0.3.8":false,"0.3.9":false},
@@ -70,7 +72,7 @@ export function baiduCircleCIMeta(env={}){
 }
 
 function requireConfig(env){const token=str(env.CIRCLECI_API_TOKEN),project=str(env.CIRCLECI_PROJECT_SLUG),definition=str(env.CIRCLECI_PIPELINE_DEFINITION_ID);if(!token||!project||!definition)throw Object.assign(new Error("BAIDU_CIRCLECI_BRIDGE_NOT_CONFIGURED"),{status:503});return {token,project,definition,branch:str(env.CIRCLECI_CONFIG_BRANCH)||"main"}}
-export async function triggerBaiduBridge(env,{op,task_id,baidu_job_id="",bridge_ticket}){const cfg=requireConfig(env),operation=str(op).toUpperCase();if(!ALLOWED_OPS.has(operation))throw Object.assign(new Error("BAIDU_BRIDGE_OPERATION_DENIED"),{status:400});const id=str(task_id);if(!/^[A-Za-z0-9._:-]{1,96}$/.test(id))throw Object.assign(new Error("BAIDU_BRIDGE_TASK_ID_INVALID"),{status:400});const job=str(baidu_job_id);if(job&&!/^[A-Za-z0-9._:-]{1,128}$/.test(job))throw Object.assign(new Error("BAIDU_BRIDGE_JOB_ID_INVALID"),{status:400});const ticket=str(bridge_ticket);if(!/^[A-Za-z0-9_-]{32,128}$/.test(ticket))throw Object.assign(new Error("BAIDU_BRIDGE_TICKET_INVALID"),{status:500});const body={definition_id:cfg.definition,config:{branch:cfg.branch},checkout:{branch:cfg.branch},parameters:{bridge_dispatch:true,bridge_op:operation,task_id:id,baidu_job_id:job,bridge_ticket:ticket}};const c=new AbortController(),timer=setTimeout(()=>c.abort(),15000);try{const r=await fetch(`${CIRCLE_API}/project/${encSlug(cfg.project)}/pipeline/run`,{method:"POST",headers:{"Circle-Token":cfg.token,"content-type":"application/json",accept:"application/json"},body:JSON.stringify(body),signal:c.signal});const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch{}if(!r.ok)throw Object.assign(new Error(`CIRCLECI_HTTP_${r.status}`),{status:r.status>=500?502:r.status,details:{circle_status:r.status}});return {ok:true,pipeline_id:str(data.id)||null,pipeline_number:Number(data.number||0)||null,state:str(data.state)||"created"}}catch(e){if(e?.name==="AbortError")throw Object.assign(new Error("CIRCLECI_TRIGGER_TIMEOUT"),{status:504});throw e}finally{clearTimeout(timer)}}
+export async function triggerBaiduBridge(env,{op,task_id,baidu_job_id="",bridge_ticket}){const cfg=requireConfig(env),operation=str(op).toUpperCase();if(!ALLOWED_OPS.has(operation))throw Object.assign(new Error("BAIDU_BRIDGE_OPERATION_DENIED"),{status:400});const id=str(task_id);if(!/^[A-Za-z0-9._:-]{1,96}$/.test(id))throw Object.assign(new Error("BAIDU_BRIDGE_TASK_ID_INVALID"),{status:400});const job=str(baidu_job_id);if(job&&!/^[A-Za-z0-9._:-]{1,128}$/.test(job))throw Object.assign(new Error("BAIDU_BRIDGE_JOB_ID_INVALID"),{status:400});const ticket=str(bridge_ticket);if(!/^[A-Za-z0-9_-]{32,128}$/.test(ticket))throw Object.assign(new Error("BAIDU_BRIDGE_TICKET_INVALID"),{status:500});const sdkVersion=operation==="SDK_SELFTEST"?"0.3.9":"0.3.8";const body={definition_id:cfg.definition,config:{branch:cfg.branch},checkout:{branch:cfg.branch},parameters:{bridge_dispatch:true,bridge_op:operation,task_id:id,baidu_job_id:job,bridge_ticket:ticket,sdk_version:sdkVersion}};const c=new AbortController(),timer=setTimeout(()=>c.abort(),15000);try{const r=await fetch(`${CIRCLE_API}/project/${encSlug(cfg.project)}/pipeline/run`,{method:"POST",headers:{"Circle-Token":cfg.token,"content-type":"application/json",accept:"application/json"},body:JSON.stringify(body),signal:c.signal});const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch{}if(!r.ok)throw Object.assign(new Error(`CIRCLECI_HTTP_${r.status}`),{status:r.status>=500?502:r.status,details:{circle_status:r.status}});return {ok:true,pipeline_id:str(data.id)||null,pipeline_number:Number(data.number||0)||null,state:str(data.state)||"created",sdk_version:sdkVersion}}catch(e){if(e?.name==="AbortError")throw Object.assign(new Error("CIRCLECI_TRIGGER_TIMEOUT"),{status:504});throw e}finally{clearTimeout(timer)}}
 export async function digestBridgeTicket(ticket){const h=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(str(ticket)));return[...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 export function newBridgeTicket(){const b=new Uint8Array(32);crypto.getRandomValues(b);return btoa(String.fromCharCode(...b)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 export function normalizeBaiduInput(input={}){const clamp=(v,a,b,d)=>{const n=Number(v);return Number.isFinite(n)?Math.max(a,Math.min(b,Math.trunc(n))):d};return{matrix_size:clamp(input.matrix_size,256,2048,1024),rounds:clamp(input.rounds,1,5,2),seed:clamp(input.seed,1,2147483647,20260815)}}
