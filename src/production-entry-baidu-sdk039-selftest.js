@@ -3,12 +3,12 @@ import {baiduCircleCIMeta,digestBridgeTicket,newBridgeTicket,triggerBaiduBridge}
 export {CenterGate};
 
 const CIRCLE_API="https://circleci.com/api/v2";
-const TASK_ID="baidu-sdk039-control-plane-20260816a";
-const SELFTEST_PATH="/__selftest/baidu-sdk039-control-20260816-8f74851bb92a45ec9bf62f15aa9bd42e";
-const DIRECT_TRIGGER_PATH="/__selftest/baidu-sdk039-direct-20260816-f56561f423a550b1e0fbf25189ec7f12f5796e19e999e2c46527795b5b718ba8";
-const STATUS_PATH="/__diagnostic/baidu-sdk039-control-result-20260816-d61c6d7be1ca4f43806ac1a021c1d8e8";
-const SELFTEST_EXPIRES_AT=Date.parse("2026-08-16T13:45:00Z");
-const DIAGNOSTIC_EXPIRES_AT=Date.parse("2026-08-16T14:15:00Z");
+const TASK_ID="baidu-sdk039-control-plane-20260816b";
+const SELFTEST_PATH="/__selftest/baidu-sdk039-control-b-20260816-02b50019f252cea7d92054e2cd44eff1";
+const DIRECT_TRIGGER_PATH="/__selftest/baidu-sdk039-direct-20260816-4aa2e07044ecd45921dc58d9ed8b6987d3138cb48f472d3c379d543275eef8d9";
+const STATUS_PATH="/__diagnostic/baidu-sdk039-control-result-b-20260816-02b50019f252cea7d92054e2cd44eff1";
+const SELFTEST_EXPIRES_AT=Date.parse("2026-08-16T14:00:00Z");
+const DIAGNOSTIC_EXPIRES_AT=Date.parse("2026-08-16T14:20:00Z");
 const SDK_VERSION="0.3.9";
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
 const now=()=>new Date().toISOString();
