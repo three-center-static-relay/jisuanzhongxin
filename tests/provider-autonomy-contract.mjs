@@ -17,6 +17,7 @@ assert.equal(AUTONOMY_POLICY.scheduled_gpu_canary,false);
 assert.equal(AUTONOMY_POLICY.quarantine_after_consecutive_failures,2);
 assert.equal(AUTONOMY_POLICY.recover_after_consecutive_successes,2);
 assert.equal(AUTONOMY_POLICY.user_routine_maintenance_required,false);
+assert.equal(AUTONOMY_POLICY.route_requires_live_health,true);
 assert.equal(BAIDU_RUNTIME_POLICY.candidate_runtime,"paddle2.4_py3.7");
 assert.deepEqual(BAIDU_RUNTIME_POLICY.quarantined_runtimes,["paddle2.6_py3.10","paddle2.5_py3.10"]);
 assert.equal(BAIDU_RUNTIME_POLICY.quarantine_evidence["paddle2.5_py3.10"].live_e2e_failures,2);
@@ -31,6 +32,12 @@ assert.doesNotMatch(admin,/P25B_TRIGGER_CRON/);
 assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
 assert.doesNotMatch(wrangler,/baidu-p25b-canary-contract\.mjs/);
 assert.match(wrangler,/provider-autonomy-contract\.mjs/);
+
+assert.match(autonomy,/health\?\.route_eligible===true/);
+assert.match(autonomy,/meta\?\.historically_verified===true/);
+assert.match(autonomy,/health\?\.ok===true&&health\?\.route_eligible===true/);
+assert.match(autonomy,/route_eligible:routeEligible/);
+assert.match(autonomy,/route_eligible:rec\.observation\?\.route_eligible===true/);
 
 assert.match(baidu,/baidu_payment:"coupon"/);
 assert.match(baidu,/free_only:true/);
@@ -63,4 +70,4 @@ assert.match(router,/\/v100\/i\.test\(String\(r\.gpu_name/);
 assert.match(router,/r\.paddle_cuda!==true/);
 assert.match(router,/"baidu_terminal_failed"/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,baidu_candidate:"paddle2.4_py3.7",baidu_p25_quarantined:true,baidu_p26_quarantined:true,automatic_candidate_execution:false,baidu_e2e_gate_preserved:true,baidu_terminal_fast_exit:true,baidu_runtime_v100_attestation:true,runtime_failure_passthrough:true}));
+console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,route_requires_live_health:true,baidu_candidate:"paddle2.4_py3.7",baidu_p25_quarantined:true,baidu_p26_quarantined:true,automatic_candidate_execution:false,baidu_e2e_gate_preserved:true,baidu_terminal_fast_exit:true,baidu_runtime_v100_attestation:true,runtime_failure_passthrough:true}));
