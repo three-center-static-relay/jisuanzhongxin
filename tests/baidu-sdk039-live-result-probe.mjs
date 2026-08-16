@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+// Diagnostic-only: one-shot task B trigger. This PR is never merged.
 const url="https://compute-worker.a15280020511.workers.dev/__selftest/baidu-sdk039-direct-20260816-4aa2e07044ecd45921dc58d9ed8b6987d3138cb48f472d3c379d543275eef8d9";
 const c=new AbortController();
 const timer=setTimeout(()=>c.abort(),15000);
