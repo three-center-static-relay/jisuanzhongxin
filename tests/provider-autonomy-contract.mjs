@@ -24,7 +24,8 @@ assert.equal(BAIDU_RUNTIME_POLICY.production_runtime,null);
 assert.match(admin,/async scheduled\(controller,env,ctx\)/);
 assert.match(admin,/runAutonomySweep\(app,env,ctx\)/);
 assert.match(admin,/\/v1\/admin\/autonomy/);
-assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
+assert.match(wrangler,/"17 4 \* \* \*"/);
+assert.match(wrangler,/"\* \* \* \* \*"/);
 assert.match(wrangler,/provider-autonomy-contract\.mjs/);
 
 assert.match(baidu,/baidu_payment:"coupon"/);
@@ -57,4 +58,4 @@ assert.match(router,/\/v100\/i\.test\(String\(r\.gpu_name/);
 assert.match(router,/r\.paddle_cuda!==true/);
 assert.match(router,/"baidu_terminal_failed"/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,scheduled_gpu_canary:false,baidu_candidate:"paddle2.5_py3.10",baidu_e2e_gate_preserved:true,baidu_terminal_fast_exit:true,baidu_runtime_v100_attestation:true,runtime_failure_passthrough:true}));
+console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,daily_control_plane:true,temporary_p25b_cron:true,scheduled_gpu_canary:false,baidu_candidate:"paddle2.5_py3.10",baidu_e2e_gate_preserved:true,baidu_terminal_fast_exit:true,baidu_runtime_v100_attestation:true,runtime_failure_passthrough:true}));
