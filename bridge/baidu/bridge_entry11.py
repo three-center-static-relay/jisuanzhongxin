@@ -1,6 +1,5 @@
 import json
 import pathlib
-import shlex
 import sys
 import tempfile
 import time
@@ -8,20 +7,27 @@ import time
 import bridge as impl
 import bridge_entry4 as check_impl
 
+START_COMMAND = "sh run.sh"
 
-def shell_command(task_id):
-    payload = json.dumps({
+
+def shell_payload(task_id):
+    return json.dumps({
         "ok": False,
         "task_id": task_id,
         "profile": "gpu",
         "failure_class": "BAIDU_SHELL_CANARY_EXECUTED",
-        "failure_stage": "shell_inline",
+        "failure_stage": "shell_run_script",
     }, separators=(",", ":"), sort_keys=True)
-    inner = (
-        "mkdir -p /home/aistudio/output && "
-        f"printf '%s' {shlex.quote(payload)} > /home/aistudio/output/three-center-result.json"
+
+
+def run_script(task_id):
+    payload = shell_payload(task_id).replace("'", "'\"'\"'")
+    return (
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "mkdir -p /home/aistudio/output\n"
+        f"printf '%s' '{payload}' > /home/aistudio/output/three-center-result.json\n"
     )
-    return "sh -lc " + shlex.quote(inner)
 
 
 def submit_and_wait_shell(task_id):
@@ -29,12 +35,12 @@ def submit_and_wait_shell(task_id):
     timeout_seconds = max(60, min(300, int(manifest.get("timeout_seconds") or 120)))
     with tempfile.TemporaryDirectory(prefix="three-center-baidu-shell-") as td:
         work = pathlib.Path(td)
-        (work / "probe.txt").write_text("fixed-shell-canary\n", encoding="utf-8")
+        (work / "run.sh").write_text(run_script(task_id), encoding="utf-8")
         p = impl.run([
             "aistudio", "submit", "job",
             "--name", impl.expected_pipeline_name(task_id),
             "--path", str(work),
-            "--cmd", shell_command(task_id),
+            "--cmd", START_COMMAND,
             "--env", "paddle2.6_py3.10",
             "--device", "v100",
             "--gpus", "1",
@@ -60,18 +66,20 @@ def submit_and_wait_shell(task_id):
 
 def selftest():
     task_id = "baidu-circleci-live-20260816k"
-    cmd = shell_command(task_id)
+    script = run_script(task_id)
     for needle in [
-        "sh -lc",
+        "#!/bin/sh",
         task_id,
         "/home/aistudio/output/three-center-result.json",
         "BAIDU_SHELL_CANARY_EXECUTED",
     ]:
-        if needle not in cmd:
-            raise AssertionError("SHELL_CANARY_COMMAND_MISSING:" + needle)
+        if needle not in script:
+            raise AssertionError("SHELL_CANARY_SCRIPT_MISSING:" + needle)
+    if START_COMMAND != "sh run.sh":
+        raise AssertionError("START_COMMAND_MISMATCH")
     if impl.expected_pipeline_name(task_id) != "three-center-baidu-circleci-live-20260816k":
         raise AssertionError("PIPELINE_NAME_MISMATCH")
-    print(json.dumps({"ok": True, "suite": "baidu-shell-startup-canary", "cases": 5}))
+    print(json.dumps({"ok": True, "suite": "baidu-shell-startup-canary", "cases": 6}))
     return 0
 
 
