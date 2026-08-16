@@ -34,6 +34,12 @@ export function modalMeta(){
 
 function cleanBaseUrl(v){return String(v||"").trim().replace(/\/+$/g,"")}
 function validHttpsUrl(v){try{const u=new URL(v);return u.protocol==="https:"}catch{return false}}
+function deriveGpuEndpoint(cpuEndpoint){
+  const base=cleanBaseUrl(cpuEndpoint);
+  const suffix="-bridge.modal.run";
+  if(!base.endsWith(suffix))return"";
+  return `${base.slice(0,-suffix.length)}-gpu-selftest.modal.run`;
+}
 function bridgeConfig(env){
   const endpoint=cleanBaseUrl(env.MODAL_ENDPOINT_URL);
   const proxyId=String(env.MODAL_PROXY_TOKEN_ID||"").trim();
@@ -47,11 +53,14 @@ function bridgeConfig(env){
   };
 }
 function gpuConfig(env){
-  const gpuEndpoint=cleanBaseUrl(env.MODAL_GPU_ENDPOINT_URL);
+  const explicitGpuEndpoint=cleanBaseUrl(env.MODAL_GPU_ENDPOINT_URL);
+  const derivedGpuEndpoint=deriveGpuEndpoint(env.MODAL_ENDPOINT_URL);
+  const gpuEndpoint=explicitGpuEndpoint||derivedGpuEndpoint;
+  const endpointSource=explicitGpuEndpoint?"explicit-binding":(derivedGpuEndpoint?"derived-from-cpu-endpoint":"missing");
   const proxyId=String(env.MODAL_PROXY_TOKEN_ID||"").trim();
   const proxySecret=String(env.MODAL_PROXY_TOKEN_SECRET||"").trim();
   return {
-    gpuEndpoint,proxyId,proxySecret,
+    gpuEndpoint,endpointSource,proxyId,proxySecret,
     configured:Boolean(gpuEndpoint&&proxyId&&proxySecret),
     endpointValid:validHttpsUrl(gpuEndpoint),
     proxyIdValid:/^wk-[A-Za-z0-9_-]+$/.test(proxyId),
@@ -67,7 +76,7 @@ export async function modalHealth(env){
   const apiSecret=String(env.MODAL_TOKEN_SECRET||"").trim();
   const apiPairConfigured=Boolean(apiId&&apiSecret);
   const {endpoint,proxyId,proxySecret,configured,endpointValid,proxyIdValid,proxySecretValid}=bridgeConfig(env);
-  const gpuEndpoint=cleanBaseUrl(env.MODAL_GPU_ENDPOINT_URL);
+  const gpu= gpuConfig(env);
   const base={
     provider:PROVIDER,
     api_token_pair_configured:apiPairConfigured,
@@ -76,7 +85,8 @@ export async function modalHealth(env){
     direct_cloudflare_sdk_supported:false,
     bridge_required:true,
     endpoint_configured:Boolean(endpoint),
-    gpu_endpoint_configured:Boolean(gpuEndpoint),
+    gpu_endpoint_configured:Boolean(gpu.gpuEndpoint),
+    gpu_endpoint_source:gpu.endpointSource,
     proxy_token_id_configured:Boolean(proxyId),
     proxy_token_secret_configured:Boolean(proxySecret),
     proxy_token_id_format_ok:proxyIdValid,
@@ -141,9 +151,9 @@ export async function modalCpuSelftest(env,n=10000){
 }
 
 export async function modalGpuSelftest(env,n=10000){
-  const {gpuEndpoint,proxyId,proxySecret,configured,endpointValid,proxyIdValid,proxySecretValid}=gpuConfig(env);
-  if(!configured)return {ok:false,provider:PROVIDER,error:"MODAL_GPU_ENDPOINT_CONFIG_REQUIRED",gpu_endpoint_configured:Boolean(gpuEndpoint),route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false};
-  if(!endpointValid||!proxyIdValid||!proxySecretValid)return {ok:false,provider:PROVIDER,error:"MODAL_GPU_CONFIG_INVALID",route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false};
+  const {gpuEndpoint,endpointSource,proxyId,proxySecret,configured,endpointValid,proxyIdValid,proxySecretValid}=gpuConfig(env);
+  if(!configured)return {ok:false,provider:PROVIDER,error:"MODAL_GPU_ENDPOINT_CONFIG_REQUIRED",gpu_endpoint_configured:Boolean(gpuEndpoint),gpu_endpoint_source:endpointSource,route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false};
+  if(!endpointValid||!proxyIdValid||!proxySecretValid)return {ok:false,provider:PROVIDER,error:"MODAL_GPU_CONFIG_INVALID",gpu_endpoint_source:endpointSource,route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false};
   if(!Number.isInteger(n)||n<1||n>100000)return {ok:false,provider:PROVIDER,error:"INVALID_N",allowed_range:[1,100000],secret_echo:false};
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),60000);
@@ -165,6 +175,7 @@ export async function modalGpuSelftest(env,n=10000){
       ok:gpuOk,
       provider:PROVIDER,
       bridge_http_status:r.status,
+      gpu_endpoint_source:endpointSource,
       gpu_requested:"T4",
       cuda_available:Boolean(upstream?.cuda_available),
       device_type:String(upstream?.device_type||"").slice(0,40),
@@ -183,6 +194,6 @@ export async function modalGpuSelftest(env,n=10000){
       acceptance_state:gpuOk?"gpu-e2e-pass-awaiting-router-enable":"gpu-e2e-failed"
     };
   }catch(e){
-    return {ok:false,provider:PROVIDER,error:e?.name==="AbortError"?"MODAL_GPU_E2E_TIMEOUT":"MODAL_GPU_E2E_UNAVAILABLE",route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false,acceptance_state:"gpu-e2e-failed"};
+    return {ok:false,provider:PROVIDER,error:e?.name==="AbortError"?"MODAL_GPU_E2E_TIMEOUT":"MODAL_GPU_E2E_UNAVAILABLE",gpu_endpoint_source:endpointSource,route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false,acceptance_state:"gpu-e2e-failed"};
   }finally{clearTimeout(timer)}
 }
