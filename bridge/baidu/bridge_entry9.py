@@ -8,6 +8,8 @@ import time
 import bridge as impl
 import bridge_entry4 as check_impl
 
+RUNTIME_CANDIDATE = "paddle2.5_py3.10"
+
 
 def submit_and_wait_absolute(task_id):
     manifest = impl.api("GET", f"/v1/providers/baidu/bridge/task/{task_id}")
@@ -22,7 +24,7 @@ def submit_and_wait_absolute(task_id):
             "--name", impl.expected_pipeline_name(task_id),
             "--path", str(work),
             "--cmd", command,
-            "--env", "paddle2.6_py3.10",
+            "--env", RUNTIME_CANDIDATE,
             "--device", "v100",
             "--gpus", "1",
             "--payment", "coupon",
@@ -58,7 +60,9 @@ def selftest():
         raise AssertionError("ABSOLUTE_START_COMMAND_MISMATCH")
     if impl.expected_pipeline_name(task_id) != "three-center-baidu-circleci-live-20260815i":
         raise AssertionError("PIPELINE_NAME_MISMATCH")
-    print(json.dumps({"ok": True, "suite": "baidu-absolute-startup", "cases": 2}))
+    if RUNTIME_CANDIDATE != "paddle2.5_py3.10":
+        raise AssertionError("RUNTIME_CANDIDATE_MISMATCH")
+    print(json.dumps({"ok": True, "suite": "baidu-absolute-startup", "cases": 3, "runtime_candidate": RUNTIME_CANDIDATE}))
     return 0
 
 
