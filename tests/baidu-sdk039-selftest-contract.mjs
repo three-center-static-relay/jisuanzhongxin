@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import {baiduCircleCIMeta} from "../src/baidu-circleci.js";
 
+// Direct trigger is temporary, high entropy, time bounded, and SDK-control-plane-only.
 const wrapper=fs.readFileSync(new URL("../src/production-entry-baidu-sdk039-selftest.js",import.meta.url),"utf8");
 const admin=fs.readFileSync(new URL("../src/admin-entry.js",import.meta.url),"utf8");
 const config=fs.readFileSync(new URL("../.circleci/config.yml",import.meta.url),"utf8");
