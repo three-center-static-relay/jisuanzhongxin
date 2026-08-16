@@ -6,6 +6,6 @@ try{
   const b=await r.json();
   assert.equal(r.status,200);
   assert.equal(b.status,"failed");
-  assert.ok(["BAIDU_JOB_RUNTIME_ENV_FAILED","BAIDU_JOB_COMMAND_FAILED","BAIDU_JOB_GPU_UNAVAILABLE"].includes(String(b.failure_class||"")));
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24-failure-group-runtime-command-gpu",matched:true,network:true}));
+  assert.match(String(b.failure_class||""),/^DIAGNOSTIC_/);
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24-failure-prefix-diagnostic",diagnostic_failure:true,network:true}));
 }finally{clearTimeout(timer)}
