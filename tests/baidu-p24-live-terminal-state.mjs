@@ -14,5 +14,5 @@ try{
   assert.equal(b.secrets_redacted,true);
   assert.equal(b.source_job_id_exposed,false);
   assert.equal(b.result_body_exposed,false);
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24-live-terminal-state",status:b.status,failure_class_present:true,upstream_diagnostic_present:Boolean(b.upstream_diagnostic),network:true}));
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24-live-terminal-state-recheck",status:b.status,failure_class_present:true,upstream_diagnostic_present:Boolean(b.upstream_diagnostic),network:true}));
 }finally{clearTimeout(timer)}
