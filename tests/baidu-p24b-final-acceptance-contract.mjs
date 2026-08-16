@@ -40,7 +40,9 @@ assert.doesNotMatch(admin,/P24B_TRIGGER_CRON/);
 assert.doesNotMatch(admin,/P24B_ACCEPTANCE_PATH/);
 assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
 assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
-assert.match(sdkWrapper,/DIRECT_TRIGGER_PATH="\/__selftest\/baidu-sdk039-direct-20260816-[a-f0-9]{64}"/);
+assert.match(sdkWrapper,/DIRECT_TRIGGER_PATH="\/__selftest\/baidu-sdk039-direct-c-20260816-[a-f0-9]{64}"/);
+assert.match(sdkWrapper,/CALLBACK_PATH="\/__callback\/baidu-sdk039-c-20260816-[a-f0-9]{64}"/);
+assert.match(sdkWrapper,/terminal_callback_received:true/);
 assert.match(sdkWrapper,/op:"SDK_SELFTEST"/);
 assert.match(sdkWrapper,/gpu:false/);
 assert.match(sdkWrapper,/compute_credit_used:false/);
@@ -55,4 +57,4 @@ assert.match(bridge,/"--gpus", "1"/);
 assert.match(bridge,/"--payment", "coupon"/);
 assert.doesNotMatch(bridge,/"--payment", "acoin"/);
 
-console.log(JSON.stringify({ok:true,suite:"baidu-p24b-final-acceptance-contract",runtime:"paddle2.4_py3.7",p24b_result:"failed",failure_class:"BAIDU_JOB_TERMINAL_FAILED",bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",candidate_state:"QUARANTINED",live_e2e_failures:2,production_runtime:null,route_eligible:false,automatic_retry:false,p24b_trigger_removed:true,temporary_sdk039_probe_zero_gpu:true,minute_cron:false}));
+console.log(JSON.stringify({ok:true,suite:"baidu-p24b-final-acceptance-contract",runtime:"paddle2.4_py3.7",p24b_result:"failed",failure_class:"BAIDU_JOB_TERMINAL_FAILED",bootstrap_reason:"BOOTSTRAP_NOT_AVAILABLE",candidate_state:"QUARANTINED",live_e2e_failures:2,production_runtime:null,route_eligible:false,automatic_retry:false,p24b_trigger_removed:true,temporary_sdk039_task_c_zero_gpu:true,terminal_callback:true,minute_cron:false}));

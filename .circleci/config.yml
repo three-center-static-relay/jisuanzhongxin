@@ -63,7 +63,7 @@ jobs:
       - run:
           name: Run bounded Baidu bridge operation
           when: always
-          no_output_timeout: 10m
+          no_output_timeout: 2m
           environment:
             BRIDGE_OP: << pipeline.parameters.bridge_op >>
             BRIDGE_TASK_ID: << pipeline.parameters.task_id >>
@@ -71,7 +71,7 @@ jobs:
             BRIDGE_TICKET: << pipeline.parameters.bridge_ticket >>
           command: |
             if [ "<< pipeline.parameters.bridge_op >>" = "SDK_SELFTEST" ]; then
-              python bridge/baidu/sdk_selftest.py
+              SDK_SELFTEST_CALLBACK_PATH="/__callback/baidu-sdk039-c-20260816-b6c4e1f2a7935d08472e61c9bd563e1094f7a2c81d6e35b9f0248a7c53d18e60" python bridge/baidu/sdk_selftest.py
             else
               python bridge/baidu/bridge_entry9.py
             fi
