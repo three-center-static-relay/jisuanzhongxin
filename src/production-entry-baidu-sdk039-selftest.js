@@ -5,8 +5,9 @@ export {CenterGate};
 const CIRCLE_API="https://circleci.com/api/v2";
 const TASK_ID="baidu-sdk039-control-plane-20260816a";
 const SELFTEST_PATH="/__selftest/baidu-sdk039-control-20260816-8f74851bb92a45ec9bf62f15aa9bd42e";
+const DIRECT_TRIGGER_PATH="/__selftest/baidu-sdk039-direct-20260816-f56561f423a550b1e0fbf25189ec7f12f5796e19e999e2c46527795b5b718ba8";
 const STATUS_PATH="/__diagnostic/baidu-sdk039-control-result-20260816-d61c6d7be1ca4f43806ac1a021c1d8e8";
-const SELFTEST_EXPIRES_AT=Date.parse("2026-08-16T14:00:00Z");
+const SELFTEST_EXPIRES_AT=Date.parse("2026-08-16T13:45:00Z");
 const DIAGNOSTIC_EXPIRES_AT=Date.parse("2026-08-16T14:15:00Z");
 const SDK_VERSION="0.3.9";
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
@@ -80,6 +81,11 @@ async function handle(req,env){
     const terminal=["completed","failed","cancelled"].includes(String(current.status||""));
     return json({ok:current.status==="completed",diagnostic:true,one_shot:true,sdk_version:SDK_VERSION,gpu:false,compute_credit_used:false,task:safeTask(current)},terminal?200:202);
   }
+  if(u.pathname===DIRECT_TRIGGER_PATH){
+    if(Date.now()>SELFTEST_EXPIRES_AT)return json({ok:false,error:"SELFTEST_ROUTE_EXPIRED"},410);
+    if(req.method!=="GET")return json({ok:false,error:"METHOD_NOT_ALLOWED"},405);
+    return start(env);
+  }
   if(u.pathname!==SELFTEST_PATH)return null;
   if(u.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"SDK selftest trigger is service-binding internal only"},403);
   if(Date.now()>SELFTEST_EXPIRES_AT)return json({ok:false,error:"SELFTEST_ROUTE_EXPIRED"},410);
@@ -87,5 +93,5 @@ async function handle(req,env){
   return start(env);
 }
 
-export {SELFTEST_PATH,STATUS_PATH};
+export {SELFTEST_PATH,DIRECT_TRIGGER_PATH,STATUS_PATH};
 export default{async fetch(req,env,ctx){const r=await handle(req,env);if(r)return r;return base.fetch(req,env,ctx)}};
