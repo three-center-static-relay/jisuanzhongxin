@@ -4,6 +4,6 @@ const c=new AbortController();const timer=setTimeout(()=>c.abort(),15000);
 try{
   const r=await fetch(url,{headers:{accept:"application/json"},signal:c.signal});
   await r.text();
-  assert.ok(r.status>=400&&r.status<500);
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-status",state:"http-4xx",network:true}));
+  assert.ok(r.status>=200&&r.status<300);
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-status",state:"http-2xx",network:true}));
 }finally{clearTimeout(timer)}
