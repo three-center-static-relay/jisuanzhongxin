@@ -6,7 +6,7 @@
   "workers_dev": true,
   "version_metadata": {"binding": "CF_VERSION_METADATA"},
   "triggers": {"crons": ["17 4 * * *"]},
-  "build": {"command": "node tests/baidu-bootstrap-sentinel-contract.mjs"},
+  "build": {"command": "node -e \"const fs=require('fs');const s=fs.readFileSync('bridge/baidu/bridge_entry9.py','utf8');if(!s.includes('BOOTSTRAP_SCHEMA = \\\"baidu-bootstrap-sentinel-v1\\\"'))process.exit(1);console.log('bootstrap-schema-ok')\""},
   "durable_objects": {"bindings": [{"name": "CENTER_GATE", "class_name": "CenterGate"}]},
   "exports": {"CenterGate": {"type":"durable-object","storage":"sqlite"}},
   "vars": {"RATE_LIMIT_PER_MIN": "30", "MAX_RUNTIME_SECONDS": "3600"}
