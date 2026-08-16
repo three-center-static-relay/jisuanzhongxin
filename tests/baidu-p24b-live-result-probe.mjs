@@ -11,9 +11,10 @@ try{
   assert.equal(b.one_shot,true);
   assert.ok(b.task&&typeof b.task==="object");
   assert.equal(b.task.task_id,"baidu-circleci-live-20260816p24b");
-  assert.ok(["completed","failed","cancelled"].includes(String(b.task.status||"")));
+  assert.equal(b.ok,false);
+  assert.equal(b.task.status,"failed");
   assert.equal(b.task.production_promoted,false);
-  assert.equal(b.ok,true);
-  assert.equal(b.task.status,"completed");
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-result-probe",terminal:true,completed:true,sanitized:true}));
+  assert.equal(typeof b.task.failure_class,"string");
+  assert.ok(b.task.failure_class.length>0);
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-result-probe",terminal:true,failed:true,failure_class_present:true,sanitized:true}));
 }finally{clearTimeout(timer)}
