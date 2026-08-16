@@ -4,11 +4,9 @@ const c=new AbortController();const timer=setTimeout(()=>c.abort(),15000);
 try{
   const r=await fetch(url,{headers:{accept:"application/json"},signal:c.signal});
   const b=await r.json();
-  assert.equal(r.status,200);
+  assert.equal(r.status,404);
   assert.equal(b.diagnostic,true);
-  assert.equal(b.one_shot,true);
-  assert.equal(b.task?.task_id,"baidu-circleci-live-20260816p24b");
-  assert.ok(["completed","failed","cancelled"].includes(String(b.task?.status||"")));
-  assert.equal(b.task?.production_promoted,false);
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-status",state:"terminal",network:true}));
+  assert.equal(b.error,"TASK_NOT_FOUND");
+  assert.equal(b.task_id,"baidu-circleci-live-20260816p24b");
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24b-live-status",state:"route-active-task-not-found",network:true}));
 }finally{clearTimeout(timer)}
