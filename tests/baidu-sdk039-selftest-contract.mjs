@@ -19,8 +19,10 @@ assert.ok(meta.allowed_operations.includes("SDK_SELFTEST"));
 
 assert.match(wrapper,/SDK_VERSION="0\.3\.9"/);
 assert.match(wrapper,/SELFTEST_PATH="\/__selftest\/baidu-sdk039-control-/);
+assert.match(wrapper,/DIRECT_TRIGGER_PATH="\/__selftest\/baidu-sdk039-direct-20260816-[a-f0-9]{64}"/);
 assert.match(wrapper,/STATUS_PATH="\/__diagnostic\/baidu-sdk039-control-result-/);
 assert.match(wrapper,/u\.hostname!=="compute\.internal"/);
+assert.match(wrapper,/u\.pathname===DIRECT_TRIGGER_PATH/);
 assert.match(wrapper,/op:"SDK_SELFTEST"/);
 assert.match(wrapper,/gpu:false/);
 assert.match(wrapper,/compute_credit_used:false/);
@@ -45,9 +47,10 @@ assert.match(probe,/"compute_credit_used": False/);
 assert.doesNotMatch(probe,/aistudio\s+submit\s+job/i);
 
 assert.match(admin,/production-entry-baidu-sdk039-selftest\.js/);
-assert.match(admin,/SELFTEST_PATH/);
-assert.match(admin,/"\* \* \* \* \*"/);
-assert.match(wrangler,/"17 4 \* \* \*"/);
-assert.match(wrangler,/"\* \* \* \* \*"/);
+assert.doesNotMatch(admin,/SELFTEST_PATH/);
+assert.doesNotMatch(admin,/"\* \* \* \* \*"/);
+assert.match(admin,/runAutonomySweep\(app,env,ctx\)/);
+assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
+assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
 
-console.log(JSON.stringify({ok:true,suite:"baidu-sdk039-selftest-contract",sdk_candidate:"0.3.9",control_plane_only:true,gpu_submitted:false,compute_credit_used:false,production_runtime:null,route_eligible:false,one_shot:true}));
+console.log(JSON.stringify({ok:true,suite:"baidu-sdk039-selftest-contract",sdk_candidate:"0.3.9",control_plane_only:true,gpu_submitted:false,compute_credit_used:false,production_runtime:null,route_eligible:false,one_shot:true,high_entropy_direct_trigger:true,minute_cron:false}));
