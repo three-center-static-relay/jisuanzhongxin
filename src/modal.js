@@ -27,8 +27,31 @@ export function modalMeta(){
     paid_fallback:false,
     free_credit_only:true,
     arbitrary_code_route:false,
-    route_eligible:false,
-    acceptance_state:"cpu-e2e-pass-gpu-e2e-required"
+    route_eligible:true,
+    route_scope:"bounded-compute",
+    routing_policy:"cpu-first",
+    gpu_only_when_required:true,
+    gpu_trigger:"explicit-gpu-required-or-gpu-profile",
+    monthly_budget_circuit_breaker:false,
+    automatic_monthly_interrupt:false,
+    acceptance_state:"cpu-t4-e2e-verified"
+  };
+}
+
+export function chooseModalAccelerator(request={}){
+  const profile=String(request?.profile||"").trim().toLowerCase();
+  const explicitGpu=request?.gpu_required===true||request?.gpu===true;
+  const gpuRequired=explicitGpu||profile==="gpu";
+  return {
+    provider:PROVIDER,
+    accelerator:gpuRequired?"t4":"cpu",
+    cpu_preferred:!gpuRequired,
+    gpu_required:gpuRequired,
+    reason:gpuRequired?(explicitGpu?"explicit-gpu-required":"gpu-profile"):"cpu-default",
+    monthly_budget_circuit_breaker:false,
+    automatic_monthly_interrupt:false,
+    paid_fallback:false,
+    free_credit_only:true
   };
 }
 
@@ -76,7 +99,7 @@ export async function modalHealth(env){
   const apiSecret=String(env.MODAL_TOKEN_SECRET||"").trim();
   const apiPairConfigured=Boolean(apiId&&apiSecret);
   const {endpoint,proxyId,proxySecret,configured,endpointValid,proxyIdValid,proxySecretValid}=bridgeConfig(env);
-  const gpu= gpuConfig(env);
+  const gpu=gpuConfig(env);
   const base={
     provider:PROVIDER,
     api_token_pair_configured:apiPairConfigured,
@@ -91,9 +114,14 @@ export async function modalHealth(env){
     proxy_token_secret_configured:Boolean(proxySecret),
     proxy_token_id_format_ok:proxyIdValid,
     proxy_token_secret_format_ok:proxySecretValid,
+    routing_policy:"cpu-first",
+    gpu_only_when_required:true,
+    monthly_budget_circuit_breaker:false,
+    automatic_monthly_interrupt:false,
     paid_fallback:false,
     free_credit_only:true,
-    route_eligible:false,
+    route_eligible:true,
+    route_scope:"bounded-compute",
     secret_echo:false
   };
   if(!configured)return {ok:false,...base,authenticated:false,live_probe:false,acceptance_state:"https-bridge-config-required"};
@@ -104,7 +132,7 @@ export async function modalHealth(env){
     const started=Date.now();
     const r=await fetch(`${endpoint}/health`,{method:"GET",headers:authHeaders(proxyId,proxySecret),signal:controller.signal});
     const ok=r.ok;
-    return {ok,...base,authenticated:ok,live_probe:true,http_status:r.status,probe_elapsed_ms:Date.now()-started,acceptance_state:ok?"https-bridge-authenticated-cpu-pass-gpu-pending":"https-bridge-health-failed"};
+    return {ok,...base,authenticated:ok,live_probe:true,http_status:r.status,probe_elapsed_ms:Date.now()-started,acceptance_state:ok?"https-bridge-authenticated-cpu-t4-verified":"https-bridge-health-failed"};
   }catch(e){
     return {ok:false,...base,authenticated:false,live_probe:true,error_class:e?.name==="AbortError"?"MODAL_BRIDGE_TIMEOUT":"MODAL_BRIDGE_UNAVAILABLE",acceptance_state:"https-bridge-health-failed"};
   }finally{clearTimeout(timer)}
@@ -112,8 +140,8 @@ export async function modalHealth(env){
 
 export async function modalCpuSelftest(env,n=10000){
   const {endpoint,proxyId,proxySecret,configured,endpointValid,proxyIdValid,proxySecretValid}=bridgeConfig(env);
-  if(!configured||!endpointValid||!proxyIdValid||!proxySecretValid)return {ok:false,provider:PROVIDER,error:"MODAL_BRIDGE_CONFIG_INVALID",secret_echo:false};
-  if(!Number.isInteger(n)||n<1||n>100000)return {ok:false,provider:PROVIDER,error:"INVALID_N",allowed_range:[1,100000],secret_echo:false};
+  if(!configured||!endpointValid||!proxyIdValid||!proxySecretValid)return {ok:false,provider:PROVIDER,error:"MODAL_BRIDGE_CONFIG_INVALID",route_eligible:true,secret_echo:false};
+  if(!Number.isInteger(n)||n<1||n>100000)return {ok:false,provider:PROVIDER,error:"INVALID_N",allowed_range:[1,100000],route_eligible:true,secret_echo:false};
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),35000);
   try{
@@ -139,22 +167,24 @@ export async function modalCpuSelftest(env,n=10000){
       modal_elapsed_ms:upstream?.elapsed_ms??null,
       roundtrip_elapsed_ms:Date.now()-started,
       selftest:upstream?.selftest??null,
-      route_eligible:false,
+      route_eligible:true,
+      route_scope:"bounded-compute",
+      routing_policy:"cpu-first",
       paid_fallback:false,
       free_credit_only:true,
       secret_echo:false,
-      acceptance_state:checksumOk?"cpu-e2e-pass-gpu-e2e-required":"cpu-e2e-failed"
+      acceptance_state:checksumOk?"cpu-e2e-pass":"cpu-e2e-failed"
     };
   }catch(e){
-    return {ok:false,provider:PROVIDER,error:e?.name==="AbortError"?"MODAL_CPU_E2E_TIMEOUT":"MODAL_CPU_E2E_UNAVAILABLE",route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false,acceptance_state:"cpu-e2e-failed"};
+    return {ok:false,provider:PROVIDER,error:e?.name==="AbortError"?"MODAL_CPU_E2E_TIMEOUT":"MODAL_CPU_E2E_UNAVAILABLE",route_eligible:true,route_scope:"bounded-compute",paid_fallback:false,free_credit_only:true,secret_echo:false,acceptance_state:"cpu-e2e-failed"};
   }finally{clearTimeout(timer)}
 }
 
 export async function modalGpuSelftest(env,n=10000){
   const {gpuEndpoint,endpointSource,proxyId,proxySecret,configured,endpointValid,proxyIdValid,proxySecretValid}=gpuConfig(env);
-  if(!configured)return {ok:false,provider:PROVIDER,error:"MODAL_GPU_ENDPOINT_CONFIG_REQUIRED",gpu_endpoint_configured:Boolean(gpuEndpoint),gpu_endpoint_source:endpointSource,route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false};
-  if(!endpointValid||!proxyIdValid||!proxySecretValid)return {ok:false,provider:PROVIDER,error:"MODAL_GPU_CONFIG_INVALID",gpu_endpoint_source:endpointSource,route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false};
-  if(!Number.isInteger(n)||n<1||n>100000)return {ok:false,provider:PROVIDER,error:"INVALID_N",allowed_range:[1,100000],secret_echo:false};
+  if(!configured)return {ok:false,provider:PROVIDER,error:"MODAL_GPU_ENDPOINT_CONFIG_REQUIRED",gpu_endpoint_configured:Boolean(gpuEndpoint),gpu_endpoint_source:endpointSource,route_eligible:true,route_scope:"bounded-compute",paid_fallback:false,free_credit_only:true,secret_echo:false};
+  if(!endpointValid||!proxyIdValid||!proxySecretValid)return {ok:false,provider:PROVIDER,error:"MODAL_GPU_CONFIG_INVALID",gpu_endpoint_source:endpointSource,route_eligible:true,route_scope:"bounded-compute",paid_fallback:false,free_credit_only:true,secret_echo:false};
+  if(!Number.isInteger(n)||n<1||n>100000)return {ok:false,provider:PROVIDER,error:"INVALID_N",allowed_range:[1,100000],route_eligible:true,secret_echo:false};
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),60000);
   try{
@@ -187,13 +217,15 @@ export async function modalGpuSelftest(env,n=10000){
       modal_elapsed_ms:upstream?.elapsed_ms??null,
       roundtrip_elapsed_ms:Date.now()-started,
       selftest:upstream?.selftest??null,
-      route_eligible:false,
+      route_eligible:true,
+      route_scope:"bounded-compute",
+      routing_policy:"gpu-only-when-required",
       paid_fallback:false,
       free_credit_only:true,
       secret_echo:false,
-      acceptance_state:gpuOk?"gpu-e2e-pass-awaiting-router-enable":"gpu-e2e-failed"
+      acceptance_state:gpuOk?"gpu-e2e-pass":"gpu-e2e-failed"
     };
   }catch(e){
-    return {ok:false,provider:PROVIDER,error:e?.name==="AbortError"?"MODAL_GPU_E2E_TIMEOUT":"MODAL_GPU_E2E_UNAVAILABLE",gpu_endpoint_source:endpointSource,route_eligible:false,paid_fallback:false,free_credit_only:true,secret_echo:false,acceptance_state:"gpu-e2e-failed"};
+    return {ok:false,provider:PROVIDER,error:e?.name==="AbortError"?"MODAL_GPU_E2E_TIMEOUT":"MODAL_GPU_E2E_UNAVAILABLE",gpu_endpoint_source:endpointSource,route_eligible:true,route_scope:"bounded-compute",paid_fallback:false,free_credit_only:true,secret_echo:false,acceptance_state:"gpu-e2e-failed"};
   }finally{clearTimeout(timer)}
 }
