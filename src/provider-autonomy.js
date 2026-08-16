@@ -25,10 +25,15 @@ export const BAIDU_RUNTIME_POLICY=Object.freeze({
   acoin_allowed:false,
   paid_fallback:false,
   production_runtime:null,
-  candidate_runtime:"paddle2.5_py3.10",
+  candidate_runtime:"paddle2.4_py3.7",
   candidate_state:"CANDIDATE",
-  quarantined_runtimes:["paddle2.6_py3.10"],
-  fallback_candidates:["paddle2.4_py3.7"],
+  quarantined_runtimes:["paddle2.6_py3.10","paddle2.5_py3.10"],
+  quarantine_evidence:{
+    "paddle2.6_py3.10":{state:"QUARANTINED",reason:"LIVE_E2E_FAILED"},
+    "paddle2.5_py3.10":{state:"QUARANTINED",reason:"TWO_CONSECUTIVE_LIVE_E2E_FAILURES",live_e2e_failures:2,latest_circleci_state:"failure",latest_elapsed_seconds:195}
+  },
+  fallback_candidates:[],
+  automatic_candidate_execution:false,
   promotion_requires:["live_e2e","v100_cuda_verified","result_digest","bridge_result_retrieved"]
 });
 

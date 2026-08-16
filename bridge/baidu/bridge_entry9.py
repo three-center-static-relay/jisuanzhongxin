@@ -8,7 +8,7 @@ import time
 import bridge as impl
 import bridge_entry4 as check_impl
 
-RUNTIME_CANDIDATE = "paddle2.5_py3.10"
+RUNTIME_CANDIDATE = "paddle2.4_py3.7"
 STATUS_PROBE_EVERY_POLLS = 2
 
 
@@ -102,14 +102,14 @@ def submit_and_wait_absolute(task_id):
 
 
 def selftest():
-    task_id = "baidu-circleci-live-20260816p25b"
+    task_id = "baidu-circleci-runtime-candidate-selftest"
     cmd = f"python3 /home/aistudio/run.py --task-id {task_id} --profile gpu"
-    expected = "python3 /home/aistudio/run.py --task-id baidu-circleci-live-20260816p25b --profile gpu"
+    expected = "python3 /home/aistudio/run.py --task-id baidu-circleci-runtime-candidate-selftest --profile gpu"
     if cmd != expected:
         raise AssertionError("ABSOLUTE_START_COMMAND_MISMATCH")
-    if impl.expected_pipeline_name(task_id) != "three-center-baidu-circleci-live-20260816p25b":
+    if impl.expected_pipeline_name(task_id) != "three-center-baidu-circleci-runtime-candidate-selftest":
         raise AssertionError("PIPELINE_NAME_MISMATCH")
-    if RUNTIME_CANDIDATE != "paddle2.5_py3.10":
+    if RUNTIME_CANDIDATE != "paddle2.4_py3.7":
         raise AssertionError("RUNTIME_CANDIDATE_MISMATCH")
     if STATUS_PROBE_EVERY_POLLS != 2:
         raise AssertionError("STATUS_PROBE_CADENCE_MISMATCH")
