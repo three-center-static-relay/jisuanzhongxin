@@ -8,8 +8,8 @@ const SELFTEST_PATH="/__selftest/baidu-sdk039-control-c-20260816-fc039ebe9710583
 const DIRECT_TRIGGER_PATH="/__selftest/baidu-sdk039-direct-c-20260816-ade741fd3291c5e71c32c7b66fd055d80a3a56062bd954c47ca7e2c33e05062e";
 const STATUS_PATH="/__diagnostic/baidu-sdk039-control-result-c-20260816-01285625c159573990bb9a1fed3d6dd84e6be7b8994f5b3ed51f5497b04fd476";
 const CALLBACK_PATH="/__callback/baidu-sdk039-c-20260816-b6c4e1f2a7935d08472e61c9bd563e1094f7a2c81d6e35b9f0248a7c53d18e60";
-const SELFTEST_EXPIRES_AT=Date.parse("2026-08-16T14:20:00Z");
-const DIAGNOSTIC_EXPIRES_AT=Date.parse("2026-08-16T14:30:00Z");
+const SELFTEST_EXPIRES_AT=Date.parse("2026-08-17T01:00:00Z");
+const DIAGNOSTIC_EXPIRES_AT=Date.parse("2026-08-17T01:20:00Z");
 const SDK_VERSION="0.3.9";
 const RESULT_SCHEMA="baidu-sdk039-selftest-result-v1";
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
