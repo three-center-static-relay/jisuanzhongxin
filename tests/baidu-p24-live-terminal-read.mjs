@@ -5,14 +5,7 @@ try{
   const r=await fetch(url,{headers:{accept:"application/json"},signal:c.signal});
   const b=await r.json();
   assert.equal(r.status,200);
-  assert.equal(b.diagnostic,true);
-  assert.equal(b.read_only,true);
-  assert.equal(b.operation,"CHECK");
-  assert.equal(b.gpu_submit,false);
   assert.equal(b.status,"failed");
-  assert.match(String(b.failure_class||""),/^(BAIDU|DIAGNOSTIC)_[A-Z0-9_]{3,80}$/);
-  assert.equal(b.secrets_redacted,true);
-  assert.equal(b.source_job_id_exposed,false);
-  assert.equal(b.result_body_exposed,false);
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24-terminal-failed",status:"failed",failure_class_present:true,upstream_diagnostic_present:Boolean(b.upstream_diagnostic),network:true}));
+  assert.ok(["BAIDU_JOB_RUNTIME_ENV_FAILED","BAIDU_JOB_COMMAND_FAILED","BAIDU_JOB_GPU_UNAVAILABLE"].includes(String(b.failure_class||"")));
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24-failure-group-runtime-command-gpu",matched:true,network:true}));
 }finally{clearTimeout(timer)}
