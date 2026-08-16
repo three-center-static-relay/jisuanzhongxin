@@ -5,7 +5,7 @@ const err=(c,m,s=400,d)=>json({ok:false,error:c,message:m,...(d?{details:d}:{})}
 const terminal=s=>["completed","failed","cancelled"].includes(String(s||""));
 const now=()=>new Date().toISOString();
 const int=(v,d)=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n):d};
-const SAFE_STAGES=new Set(["circleci_started","aistudio_authenticated","aistudio_submit_returned","baidu_submitted","result_polling","result_retrieved"]);
+const SAFE_STAGES=new Set(["circleci_started","aistudio_authenticated","aistudio_submit_returned","baidu_submitted","result_polling","result_retrieved","baidu_terminal_failed"]);
 
 function gate(env){return env.CENTER_GATE.get(env.CENTER_GATE.idFromName("global"))}
 async function g(env,p,m="GET",b){const i={method:m,headers:{"content-type":"application/json"}};if(b!==undefined)i.body=JSON.stringify(b);const r=await gate(env).fetch(new Request(`https://gate.internal${p}`,i));return{http:r.status,...await r.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}))}}
@@ -16,7 +16,13 @@ async function release(env,id){return g(env,"/release","POST",{task_id:id})}
 async function sha256(v){const h=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(v||"")));return[...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 async function body(req){const text=await req.text();if(new TextEncoder().encode(text).length>65536)throw Object.assign(new Error("BODY_TOO_LARGE"),{status:413});try{return text?JSON.parse(text):{}}catch{throw Object.assign(new Error("INVALID_REQUEST"),{status:400})}}
 function accepted(env){const m=baiduCircleCIMeta(env);return m.configured&&m.e2e_verified}
-function validResult(task,r){if(!r||r.ok!==true||String(r.task_id)!==String(task.task_id)||String(r.profile)!==String(task.profile))return{ok:false,reason:"RESULT_IDENTITY_MISMATCH"};if(r.accelerator!=="v100"||r.cuda!==true||!/gpu/i.test(String(r.device||"")))return{ok:false,reason:"V100_VERIFICATION_FAILED"};if(!/^[a-f0-9]{64}$/i.test(String(r.matrix_checksum||"")))return{ok:false,reason:"RESULT_CHECKSUM_INVALID"};return{ok:true}}
+function validResult(task,r){
+  if(!r||r.ok!==true||String(r.task_id)!==String(task.task_id)||String(r.profile)!==String(task.profile))return{ok:false,reason:"RESULT_IDENTITY_MISMATCH"};
+  if(r.accelerator!=="v100"||r.cuda!==true||r.paddle_cuda!==true)return{ok:false,reason:"V100_VERIFICATION_FAILED"};
+  if(!/v100/i.test(String(r.gpu_name||""))||!/gpu/i.test(String(r.device||"")))return{ok:false,reason:"V100_RUNTIME_ATTESTATION_FAILED"};
+  if(!/^[a-f0-9]{64}$/i.test(String(r.matrix_checksum||"")))return{ok:false,reason:"RESULT_CHECKSUM_INVALID"};
+  return{ok:true,v100_visible:true,paddle_cuda:true,gpu_name:String(r.gpu_name),device:String(r.device)}
+}
 function safeStage(v){const s=String(v||"").trim();return SAFE_STAGES.has(s)?s:null}
 function safeFailureClass(v,error=""){
   const raw=String(v||"").trim().toUpperCase();

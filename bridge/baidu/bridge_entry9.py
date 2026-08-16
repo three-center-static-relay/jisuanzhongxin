@@ -18,6 +18,15 @@ def _terminal_failure_class(query_result):
     return None
 
 
+def _runtime_failure_class(result):
+    if not isinstance(result, dict) or result.get("ok") is not False:
+        return None
+    failure_class = str(result.get("failure_class") or "BAIDU_RUNTIME_EXECUTION_ERROR").strip().upper()
+    if not failure_class.startswith("BAIDU_RUNTIME_"):
+        return "BAIDU_RUNTIME_EXECUTION_ERROR"
+    return failure_class[:80]
+
+
 def submit_and_wait_absolute(task_id):
     manifest = impl.api("GET", f"/v1/providers/baidu/bridge/task/{task_id}")
     timeout_seconds = max(60, min(900, int(manifest.get("timeout_seconds") or 300)))
@@ -50,6 +59,18 @@ def submit_and_wait_absolute(task_id):
             cancelled = cancelled or impl.soft_cancel_requested(task_id)
             result = impl.fetch_result(task_id, job_id, result_path)
             if result is not None:
+                runtime_failure = _runtime_failure_class(result)
+                if runtime_failure:
+                    impl.callback(
+                        task_id,
+                        "FETCH",
+                        "failed",
+                        baidu_job_id=job_id,
+                        error=runtime_failure,
+                        failure_class=runtime_failure,
+                        stage="result_retrieved",
+                    )
+                    return 2
                 if cancelled:
                     impl.callback(task_id, "CANCEL", "cancelled", baidu_job_id=job_id, result_discarded=True)
                 else:
@@ -81,12 +102,12 @@ def submit_and_wait_absolute(task_id):
 
 
 def selftest():
-    task_id = "baidu-circleci-live-20260815i"
+    task_id = "baidu-circleci-live-20260816p25b"
     cmd = f"python3 /home/aistudio/run.py --task-id {task_id} --profile gpu"
-    expected = "python3 /home/aistudio/run.py --task-id baidu-circleci-live-20260815i --profile gpu"
+    expected = "python3 /home/aistudio/run.py --task-id baidu-circleci-live-20260816p25b --profile gpu"
     if cmd != expected:
         raise AssertionError("ABSOLUTE_START_COMMAND_MISMATCH")
-    if impl.expected_pipeline_name(task_id) != "three-center-baidu-circleci-live-20260815i":
+    if impl.expected_pipeline_name(task_id) != "three-center-baidu-circleci-live-20260816p25b":
         raise AssertionError("PIPELINE_NAME_MISMATCH")
     if RUNTIME_CANDIDATE != "paddle2.5_py3.10":
         raise AssertionError("RUNTIME_CANDIDATE_MISMATCH")
@@ -94,6 +115,10 @@ def selftest():
         raise AssertionError("STATUS_PROBE_CADENCE_MISMATCH")
     if _terminal_failure_class({"ok": True, "category": "terminal_failed"}) != "BAIDU_JOB_TERMINAL_FAILED":
         raise AssertionError("TERMINAL_FAILURE_CLASSIFICATION_MISMATCH")
+    if _runtime_failure_class({"ok": False, "failure_class": "BAIDU_RUNTIME_CUDA_ERROR"}) != "BAIDU_RUNTIME_CUDA_ERROR":
+        raise AssertionError("RUNTIME_FAILURE_CLASSIFICATION_MISMATCH")
+    if _runtime_failure_class({"ok": True}) is not None:
+        raise AssertionError("SUCCESS_RESULT_MISCLASSIFIED")
     for nonterminal in [
         {"ok": True, "category": "not_finished"},
         {"ok": True, "category": "finished"},
@@ -101,7 +126,7 @@ def selftest():
     ]:
         if _terminal_failure_class(nonterminal) is not None:
             raise AssertionError("NONTERMINAL_MISCLASSIFIED")
-    print(json.dumps({"ok": True, "suite": "baidu-absolute-startup", "cases": 7, "runtime_candidate": RUNTIME_CANDIDATE, "terminal_fast_exit": True, "status_probe_every_polls": STATUS_PROBE_EVERY_POLLS}))
+    print(json.dumps({"ok": True, "suite": "baidu-absolute-startup", "cases": 9, "runtime_candidate": RUNTIME_CANDIDATE, "terminal_fast_exit": True, "runtime_failure_passthrough": True, "status_probe_every_polls": STATUS_PROBE_EVERY_POLLS}))
     return 0
 
 
