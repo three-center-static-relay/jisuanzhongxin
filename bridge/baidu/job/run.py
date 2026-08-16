@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 
@@ -19,6 +20,8 @@ def classify_exception(exc, stage=""):
     name = exc.__class__.__name__.lower() if exc is not None else ""
     if stage == "load_task_manifest":
         return "BAIDU_RUNTIME_TASK_MANIFEST_ERROR"
+    if stage == "query_gpu_name":
+        return "BAIDU_RUNTIME_GPU_UNAVAILABLE"
     if isinstance(exc, TimeoutError) or "task_timeout" in msg or "timed out" in msg or "timeout" in msg:
         return "BAIDU_RUNTIME_TIMEOUT"
     if isinstance(exc, (ImportError, ModuleNotFoundError)) or "no module named" in msg or "importerror" in msg:
@@ -56,6 +59,7 @@ def selftest():
         (TimeoutError("TASK_TIMEOUT"), "matmul", "BAIDU_RUNTIME_TIMEOUT"),
         (MemoryError("out of memory"), "matmul", "BAIDU_RUNTIME_OOM"),
         (RuntimeError("V100_GPU_NOT_AVAILABLE"), "select_gpu", "BAIDU_RUNTIME_GPU_UNAVAILABLE"),
+        (RuntimeError("nvidia-smi failed"), "query_gpu_name", "BAIDU_RUNTIME_GPU_UNAVAILABLE"),
         (RuntimeError("CUDA initialization failed"), "select_gpu", "BAIDU_RUNTIME_CUDA_ERROR"),
         (FileNotFoundError("task.json"), "load_task_manifest", "BAIDU_RUNTIME_TASK_MANIFEST_ERROR"),
         (RuntimeError("unexpected"), "matmul", "BAIDU_RUNTIME_EXECUTION_ERROR"),
@@ -64,10 +68,10 @@ def selftest():
         actual = classify_exception(exc, stage)
         if actual != expected:
             raise AssertionError(f"RUNTIME_CLASS_MISMATCH:{actual}:{expected}")
-    args = parse_args(["--task-id", "baidu-circleci-live-20260815i", "--profile", "gpu"])
-    if args.task_id != "baidu-circleci-live-20260815i" or args.profile != "gpu":
+    args = parse_args(["--task-id", "baidu-circleci-live-20260816p25b", "--profile", "gpu"])
+    if args.task_id != "baidu-circleci-live-20260816p25b" or args.profile != "gpu":
         raise AssertionError("RUNTIME_BOOTSTRAP_ARGS_FAILED")
-    print(json.dumps({"ok": True, "suite": "baidu-structured-runtime-bootstrap", "cases": len(cases) + 1}))
+    print(json.dumps({"ok": True, "suite": "baidu-structured-runtime-bootstrap", "cases": len(cases) + 1, "runtime_gpu_attestation": True}))
     return 0
 
 
@@ -103,8 +107,25 @@ def main(argv=None):
         stage = "install_timeout_guard"
         signal.signal(signal.SIGALRM, timed_out)
         signal.alarm(timeout_seconds)
+
+        stage = "query_gpu_name"
+        gpu_names = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            text=True,
+            timeout=30,
+        ).strip().splitlines()
+        if not gpu_names:
+            raise RuntimeError("V100_GPU_NOT_AVAILABLE:NO_GPU_NAME")
+        gpu_name = gpu_names[0].strip()
+        if "V100" not in gpu_name.upper():
+            raise RuntimeError("V100_GPU_NOT_AVAILABLE:" + gpu_name)
+
         stage = "import_paddle"
         import paddle
+        stage = "verify_paddle_cuda"
+        paddle_cuda = bool(paddle.device.is_compiled_with_cuda())
+        if not paddle_cuda:
+            raise RuntimeError("CUDA_NOT_COMPILED")
         stage = "seed"
         paddle.seed(seed)
         stage = "select_gpu"
@@ -125,7 +146,9 @@ def main(argv=None):
             "task_id": task_id,
             "profile": profile,
             "accelerator": "v100",
+            "gpu_name": gpu_name,
             "cuda": True,
+            "paddle_cuda": paddle_cuda,
             "device": str(paddle.device.get_device()),
             "matrix_size": matrix,
             "rounds": rounds,
