@@ -1,4 +1,4 @@
-import app,{CenterGate,SELFTEST_PATH} from "./production-entry-baidu-sdk039-selftest.js";
+import app,{CenterGate} from "./production-entry-baidu-sdk039-selftest.js";
 import {getAutonomySnapshot,runAutonomySweep} from "./provider-autonomy.js";
 export {CenterGate};
 
@@ -44,8 +44,7 @@ export default{
     }
     return app.fetch(req,env,ctx);
   },
-  async scheduled(controller,env,ctx){
-    if(String(controller?.cron||"")==="* * * * *"){ctx.waitUntil(app.fetch(new Request(`${ORIGIN}${SELFTEST_PATH}`,{method:"GET"}),env,ctx));return}
+  async scheduled(_controller,env,ctx){
     ctx.waitUntil(runAutonomySweep(app,env,ctx));
   }
 };
