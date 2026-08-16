@@ -25,7 +25,7 @@ function verifyResult(r){
   if(String(r.diagnostic)!==DIAGNOSTIC||String(r.runtime)!==RUNTIME)return{ok:false,reason:"P25_RUNTIME_IDENTITY_MISMATCH"};
   if(String(r.accelerator)!=="v100"||r.cuda!==true||r.paddle_cuda!==true)return{ok:false,reason:"P25_CUDA_VERIFICATION_FAILED"};
   if(!/v100/i.test(String(r.device||""))||!/gpu/i.test(String(r.paddle_device||"")))return{ok:false,reason:"P25_V100_DEVICE_VERIFICATION_FAILED"};
-  if(Math.abs(Number(r.cuda_kernel_value)-14)>1e-6)return{ok:false,reason:"P25_CUDA_KERNEL_SANITY_FAILED"};
+  const kernelValue=Number(r.cuda_kernel_value);if(!Number.isFinite(kernelValue)||Math.abs(kernelValue-14)>1e-6)return{ok:false,reason:"P25_CUDA_KERNEL_SANITY_FAILED"};
   if(!/^[a-f0-9]{64}$/i.test(String(r.matrix_checksum||"")))return{ok:false,reason:"P25_CHECKSUM_INVALID"};
   return{ok:true,runtime:RUNTIME,v100_visible:true,paddle_cuda:true,cuda_kernel_executed:true,result_file_retrieved:true};
 }
