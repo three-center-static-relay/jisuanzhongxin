@@ -25,10 +25,14 @@ export function baiduCircleCIMeta(env={}){
     baidu_gpus:1,
     sdk_pinned:"aistudio-sdk==0.3.8",
     runtime_production:null,
-    runtime_candidate:"paddle2.5_py3.10",
-    runtime_quarantined:["paddle2.6_py3.10"],
-    runtime_fallback_candidates:["paddle2.4_py3.7"],
+    runtime_candidate:"paddle2.4_py3.7",
+    runtime_quarantined:["paddle2.6_py3.10","paddle2.5_py3.10"],
+    runtime_quarantine_evidence:{
+      "paddle2.5_py3.10":{live_e2e_failures:2,latest_circleci_state:"failure",latest_elapsed_seconds:195}
+    },
+    runtime_fallback_candidates:[],
     runtime_promotion_requires:["live_e2e","v100_cuda_verified","result_digest","bridge_result_retrieved"],
+    automatic_candidate_execution:false,
     automatic_paid_upgrade:false,
     automatic_same_failure_retry:false,
     arbitrary_code:false,
