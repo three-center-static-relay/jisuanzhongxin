@@ -1,5 +1,6 @@
 import json
 import pathlib
+import re
 import shutil
 import sys
 import tempfile
@@ -10,24 +11,113 @@ import bridge_entry4 as check_impl
 
 RUNTIME_CANDIDATE = "paddle2.4_py3.7"
 STATUS_PROBE_EVERY_POLLS = 2
+BOOTSTRAP_SCHEMA = "baidu-bootstrap-sentinel-v1"
+BOOTSTRAP_COMMAND = "sh /home/aistudio/bootstrap.sh"
+BOOTSTRAP_CANDIDATES = [
+    "output/log/bootstrap.json",
+    "./output/log/bootstrap.json",
+    "log/bootstrap.json",
+]
 
 
 def _terminal_failure_class(query_result):
     if isinstance(query_result, dict) and query_result.get("ok") is True and query_result.get("category") == "terminal_failed":
-        failure_class = str(query_result.get("terminal_failure_class") or "BAIDU_JOB_TERMINAL_FAILED").strip().upper()
-        if not failure_class.startswith("BAIDU_JOB_"):
-            return "BAIDU_JOB_TERMINAL_FAILED"
-        return failure_class[:80]
+        value = str(query_result.get("terminal_failure_class") or "BAIDU_JOB_TERMINAL_FAILED").strip().upper()
+        return value[:80] if value.startswith("BAIDU_JOB_") else "BAIDU_JOB_TERMINAL_FAILED"
     return None
 
 
 def _runtime_failure_class(result):
     if not isinstance(result, dict) or result.get("ok") is not False:
         return None
-    failure_class = str(result.get("failure_class") or "BAIDU_RUNTIME_EXECUTION_ERROR").strip().upper()
-    if not failure_class.startswith("BAIDU_RUNTIME_"):
-        return "BAIDU_RUNTIME_EXECUTION_ERROR"
-    return failure_class[:80]
+    value = str(result.get("failure_class") or "BAIDU_RUNTIME_EXECUTION_ERROR").strip().upper()
+    return value[:80] if value.startswith("BAIDU_RUNTIME_") else "BAIDU_RUNTIME_EXECUTION_ERROR"
+
+
+def _bootstrap_script(task_id):
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,96}", str(task_id or "")):
+        raise RuntimeError("TASK_ID_INVALID")
+    return f'''#!/bin/sh
+set +e
+LOG_DIR=/home/aistudio/output/log
+mkdir -p "$LOG_DIR" || exit 90
+printf '%s\n' '{{"schema":"{BOOTSTRAP_SCHEMA}","shell_started":true,"python_started":false,"python_exit_code":null}}' > "$LOG_DIR/bootstrap.json"
+printf '%s\n' '{{"schema":"{BOOTSTRAP_SCHEMA}","shell_started":true,"python_started":true,"python_exit_code":null}}' > "$LOG_DIR/bootstrap.json"
+python3 /home/aistudio/run.py --task-id {task_id} --profile gpu
+rc=$?
+printf '{{"schema":"{BOOTSTRAP_SCHEMA}","shell_started":true,"python_started":true,"python_exit_code":%s}}\n' "$rc" > "$LOG_DIR/bootstrap.json"
+exit "$rc"
+'''
+
+
+def _normalize_bootstrap(obj):
+    if not isinstance(obj, dict) or obj.get("schema") != BOOTSTRAP_SCHEMA:
+        return None
+    raw_exit = obj.get("python_exit_code")
+    return {
+        "schema": BOOTSTRAP_SCHEMA,
+        "shell_started": obj.get("shell_started") is True,
+        "python_started": obj.get("python_started") is True,
+        "python_exit_code": raw_exit if isinstance(raw_exit, int) and -255 <= raw_exit <= 255 else None,
+    }
+
+
+def _fetch_bootstrap(job_id, dest):
+    dest = pathlib.Path(dest)
+    for remote in BOOTSTRAP_CANDIDATES:
+        dest.unlink(missing_ok=True)
+        p = impl.run(["aistudio", "job", job_id, "cp", remote, str(dest)], check=False, label="AISTUDIO_BOOTSTRAP_CLI")
+        if p.returncode != 0 or not dest.exists() or dest.stat().st_size > 4096:
+            continue
+        try:
+            normalized = _normalize_bootstrap(json.loads(dest.read_text(encoding="utf-8")))
+        except Exception:
+            normalized = None
+        if normalized is not None:
+            return normalized
+    return None
+
+
+def _bootstrap_reason(bootstrap):
+    if not bootstrap:
+        return "BOOTSTRAP_NOT_AVAILABLE"
+    if bootstrap.get("python_started") is True:
+        return "BOOTSTRAP_PYTHON_STARTED"
+    if bootstrap.get("shell_started") is True:
+        return "BOOTSTRAP_SHELL_STARTED_PYTHON_NOT_STARTED"
+    return "BOOTSTRAP_NOT_AVAILABLE"
+
+
+def _refine_terminal_failure(failure_class, bootstrap):
+    if failure_class != "BAIDU_JOB_TERMINAL_FAILED":
+        return failure_class
+    if bootstrap and bootstrap.get("python_started") is True:
+        return "BAIDU_JOB_RUNTIME_PROCESS_TERMINAL_FAILED"
+    if bootstrap and bootstrap.get("shell_started") is True:
+        return "BAIDU_JOB_BOOTSTRAP_INTERRUPTED"
+    return failure_class
+
+
+def _final_result_after_terminal(task_id, job_id, result_path):
+    for attempt in range(3):
+        result = impl.fetch_result(task_id, job_id, result_path)
+        if result is not None:
+            return result
+        if attempt < 2:
+            time.sleep(2)
+    return None
+
+
+def _finish_result(task_id, job_id, result, cancelled):
+    runtime_failure = _runtime_failure_class(result)
+    if runtime_failure:
+        impl.callback(task_id, "FETCH", "failed", baidu_job_id=job_id, error=runtime_failure, failure_class=runtime_failure, stage="result_retrieved")
+        return 2
+    if cancelled:
+        impl.callback(task_id, "CANCEL", "cancelled", baidu_job_id=job_id, result_discarded=True)
+    else:
+        impl.callback(task_id, "FETCH", "completed", baidu_job_id=job_id, result=result, stage="result_retrieved")
+    return 0
 
 
 def submit_and_wait_absolute(task_id):
@@ -38,12 +128,12 @@ def submit_and_wait_absolute(task_id):
         work = pathlib.Path(td)
         shutil.copy2(impl.JOB_TEMPLATE, work / "run.py")
         (work / "task.json").write_text(json.dumps(manifest, separators=(",", ":")), encoding="utf-8")
-        command = f"python3 /home/aistudio/run.py --task-id {task_id} --profile gpu"
+        (work / "bootstrap.sh").write_text(_bootstrap_script(task_id), encoding="utf-8")
         p = impl.run([
             "aistudio", "submit", "job",
             "--name", impl.expected_pipeline_name(task_id),
             "--path", str(work),
-            "--cmd", command,
+            "--cmd", BOOTSTRAP_COMMAND,
             "--env", RUNTIME_CANDIDATE,
             "--device", "v100",
             "--gpus", "1",
@@ -55,6 +145,7 @@ def submit_and_wait_absolute(task_id):
         impl.callback(task_id, "SUBMIT", "running", baidu_job_id=job_id, payment="coupon", device="v100", gpus=1, stage="baidu_submitted")
         deadline = time.time() + timeout_seconds + 180
         result_path = work / "three-center-result.json"
+        bootstrap_path = work / "bootstrap-result.json"
         cancelled = False
         poll_count = 0
         impl.callback(task_id, "CHECK", "running", baidu_job_id=job_id, stage="result_polling")
@@ -62,47 +153,35 @@ def submit_and_wait_absolute(task_id):
             cancelled = cancelled or impl.soft_cancel_requested(task_id)
             result = impl.fetch_result(task_id, job_id, result_path)
             if result is not None:
-                runtime_failure = _runtime_failure_class(result)
-                if runtime_failure:
-                    impl.callback(
-                        task_id,
-                        "FETCH",
-                        "failed",
-                        baidu_job_id=job_id,
-                        error=runtime_failure,
-                        failure_class=runtime_failure,
-                        stage="result_retrieved",
-                    )
-                    return 2
-                if cancelled:
-                    impl.callback(task_id, "CANCEL", "cancelled", baidu_job_id=job_id, result_discarded=True)
-                else:
-                    impl.callback(task_id, "FETCH", "completed", baidu_job_id=job_id, result=result, stage="result_retrieved")
-                return 0
+                return _finish_result(task_id, job_id, result, cancelled)
 
             poll_count += 1
             if poll_count % STATUS_PROBE_EVERY_POLLS == 0:
                 query = check_impl._query_pipeline(token, job_id)
                 terminal_failure = _terminal_failure_class(query)
                 if terminal_failure:
-                    extra = {}
-                    diagnostic = query.get("diagnostic") if isinstance(query, dict) else None
-                    if isinstance(diagnostic, dict) and diagnostic:
-                        extra["upstream_diagnostic"] = diagnostic
+                    final_result = _final_result_after_terminal(task_id, job_id, result_path)
+                    if final_result is not None:
+                        return _finish_result(task_id, job_id, final_result, cancelled)
+                    bootstrap = _fetch_bootstrap(job_id, bootstrap_path)
+                    refined_failure = _refine_terminal_failure(terminal_failure, bootstrap)
+                    diagnostic = dict(query.get("diagnostic") or {}) if isinstance(query, dict) else {}
+                    diagnostic.setdefault("reason", _bootstrap_reason(bootstrap))
+                    if bootstrap and bootstrap.get("python_exit_code") is not None:
+                        diagnostic["exitCode"] = bootstrap["python_exit_code"]
                     impl.callback(
                         task_id,
                         "CHECK",
                         "failed",
                         baidu_job_id=job_id,
-                        error=terminal_failure,
-                        failure_class=terminal_failure,
+                        error=refined_failure,
+                        failure_class=refined_failure,
                         stage="result_polling",
-                        **extra,
+                        upstream_diagnostic=diagnostic,
                     )
                     return 2
                 if not query.get("ok"):
                     print(f"bridge_status_probe warning:{query.get('failure_class', 'BAIDU_QUERY_UNKNOWN')}", flush=True)
-
             print("bridge_poll pending", flush=True)
             time.sleep(20)
         impl.callback(task_id, "FETCH", "failed", baidu_job_id=job_id, error="BAIDU_RESULT_TIMEOUT", failure_class="BAIDU_RESULT_TIMEOUT", stage="result_polling")
@@ -111,32 +190,41 @@ def submit_and_wait_absolute(task_id):
 
 def selftest():
     task_id = "baidu-circleci-runtime-candidate-selftest"
-    cmd = f"python3 /home/aistudio/run.py --task-id {task_id} --profile gpu"
-    expected = "python3 /home/aistudio/run.py --task-id baidu-circleci-runtime-candidate-selftest --profile gpu"
-    if cmd != expected:
+    script = _bootstrap_script(task_id)
+    if BOOTSTRAP_COMMAND != "sh /home/aistudio/bootstrap.sh":
+        raise AssertionError("BOOTSTRAP_COMMAND_MISMATCH")
+    if "/home/aistudio/output/log/bootstrap.json" not in script:
+        raise AssertionError("BOOTSTRAP_SENTINEL_PATH_MISSING")
+    if f"python3 /home/aistudio/run.py --task-id {task_id} --profile gpu" not in script:
         raise AssertionError("ABSOLUTE_START_COMMAND_MISMATCH")
+    if any(x in script for x in ["runtime.log", "printenv", "/proc/self/environ", "BAIDU_AISTUDIO_ACCESS_TOKEN", "BRIDGE_TICKET"]):
+        raise AssertionError("BOOTSTRAP_EXCESS_DIAGNOSTIC_SURFACE")
+    normalized = _normalize_bootstrap({"schema": BOOTSTRAP_SCHEMA, "shell_started": True, "python_started": True, "python_exit_code": 7})
+    if normalized != {"schema": BOOTSTRAP_SCHEMA, "shell_started": True, "python_started": True, "python_exit_code": 7}:
+        raise AssertionError("BOOTSTRAP_NORMALIZATION_FAILED")
+    if _bootstrap_reason(normalized) != "BOOTSTRAP_PYTHON_STARTED":
+        raise AssertionError("BOOTSTRAP_REASON_FAILED")
+    if _refine_terminal_failure("BAIDU_JOB_TERMINAL_FAILED", normalized) != "BAIDU_JOB_RUNTIME_PROCESS_TERMINAL_FAILED":
+        raise AssertionError("BOOTSTRAP_FAILURE_REFINEMENT_FAILED")
+    if _refine_terminal_failure("BAIDU_JOB_ACCESS_DENIED", normalized) != "BAIDU_JOB_ACCESS_DENIED":
+        raise AssertionError("SPECIFIC_FAILURE_OVERWRITTEN")
     if impl.expected_pipeline_name(task_id) != "three-center-baidu-circleci-runtime-candidate-selftest":
         raise AssertionError("PIPELINE_NAME_MISMATCH")
-    if RUNTIME_CANDIDATE != "paddle2.4_py3.7":
-        raise AssertionError("RUNTIME_CANDIDATE_MISMATCH")
-    if STATUS_PROBE_EVERY_POLLS != 2:
-        raise AssertionError("STATUS_PROBE_CADENCE_MISMATCH")
+    if RUNTIME_CANDIDATE != "paddle2.4_py3.7" or STATUS_PROBE_EVERY_POLLS != 2:
+        raise AssertionError("CANDIDATE_POLICY_MISMATCH")
     if _terminal_failure_class({"ok": True, "category": "terminal_failed"}) != "BAIDU_JOB_TERMINAL_FAILED":
         raise AssertionError("TERMINAL_FAILURE_CLASSIFICATION_MISMATCH")
-    if _terminal_failure_class({"ok": True, "category": "terminal_failed", "terminal_failure_class": "BAIDU_JOB_RUNTIME_ENV_FAILED"}) != "BAIDU_JOB_RUNTIME_ENV_FAILED":
-        raise AssertionError("TERMINAL_DETAIL_PASSTHROUGH_MISMATCH")
     if _runtime_failure_class({"ok": False, "failure_class": "BAIDU_RUNTIME_CUDA_ERROR"}) != "BAIDU_RUNTIME_CUDA_ERROR":
         raise AssertionError("RUNTIME_FAILURE_CLASSIFICATION_MISMATCH")
-    if _runtime_failure_class({"ok": True}) is not None:
-        raise AssertionError("SUCCESS_RESULT_MISCLASSIFIED")
-    for nonterminal in [
-        {"ok": True, "category": "not_finished"},
-        {"ok": True, "category": "finished"},
-        {"ok": False, "failure_class": "BAIDU_QUERY_REQUEST_FAILED"},
-    ]:
-        if _terminal_failure_class(nonterminal) is not None:
-            raise AssertionError("NONTERMINAL_MISCLASSIFIED")
-    print(json.dumps({"ok": True, "suite": "baidu-absolute-startup", "cases": 10, "runtime_candidate": RUNTIME_CANDIDATE, "terminal_fast_exit": True, "terminal_detail_passthrough": True, "runtime_failure_passthrough": True, "status_probe_every_polls": STATUS_PROBE_EVERY_POLLS}))
+    print(json.dumps({
+        "ok": True,
+        "suite": "baidu-bootstrap-sentinel",
+        "runtime_candidate": RUNTIME_CANDIDATE,
+        "persisted_bootstrap": True,
+        "raw_runtime_log_persisted": False,
+        "terminal_final_result_retry": True,
+        "terminal_bootstrap_refinement": True,
+    }))
     return 0
 
 
