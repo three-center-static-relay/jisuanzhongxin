@@ -18,6 +18,9 @@ async function normalizeMedicalImagingRequest(req){
   return new Request(req.url,{method:"POST",headers,body:JSON.stringify(body)});
 }
 
+function googleCredentialState(env){const eeSecret=Boolean(env.GOOGLE_EE_SERVICE_ACCOUNT_JSON),cloudSecret=Boolean(env.GOOGLE_CLOUD_CREDENTIALS),eeProject=Boolean(String(env.GOOGLE_EE_PROJECT_ID||"").trim()),cloudProject=Boolean(String(env.GOOGLE_CLOUD_PROJECT||"").trim());return{service_account_configured:eeSecret||cloudSecret,credential_source:eeSecret?"google-ee-specific":cloudSecret?"google-cloud-standard":null,project_override_configured:eeProject||cloudProject,project_override_source:eeProject?"google-ee-env":cloudProject?"google-cloud-env":null,accepted_credential_vars:["GOOGLE_CLOUD_CREDENTIALS","GOOGLE_EE_SERVICE_ACCOUNT_JSON"],accepted_project_vars:["GOOGLE_CLOUD_PROJECT","GOOGLE_EE_PROJECT_ID"]}}
+async function patchGoogleReadiness(req,response,env){const u=new URL(req.url);if(req.method!=="GET"||!["/health","/v1/capabilities","/capabilities","/v1/providers/google-ee/health","/v1/providers/google-ee/meta"].includes(u.pathname))return response;const body=await response.clone().json().catch(()=>null);if(!body||typeof body!=="object")return response;const state=googleCredentialState(env);if(body.compute_backends?.google_earth_engine)Object.assign(body.compute_backends.google_earth_engine,state);if(u.pathname==="/v1/providers/google-ee/health")Object.assign(body,{configured:state.service_account_configured,credential_source:body.credential_source||state.credential_source});if(u.pathname==="/v1/providers/google-ee/meta")Object.assign(body,state);return Response.json(body,{status:response.status,headers:{"cache-control":"no-store"}})}
+
 export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url);
@@ -52,6 +55,7 @@ export default {
     if(modelHandled)return modelHandled;
     const handled=await maybeHandleBaiduCircleCI(req,env);
     if(handled)return handled;
-    return production.fetch(req,env,ctx);
+    const response=await production.fetch(req,env,ctx);
+    return patchGoogleReadiness(req,response,env);
   }
 };
