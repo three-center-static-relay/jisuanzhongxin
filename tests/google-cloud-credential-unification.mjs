@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {probeEarthEngine} from "../src/google-ee.js";
+import worker from "../src/production-entry.js";
 
 const pair=await crypto.subtle.generateKey({name:"RSASSA-PKCS1-v1_5",modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:"SHA-256"},true,["sign","verify"]);
 const pkcs8=await crypto.subtle.exportKey("pkcs8",pair.privateKey);
@@ -48,5 +49,14 @@ try{
   assert.equal(tokenCalls,3);
   assert.equal(configCalls,3);
 
-  console.log(JSON.stringify({ok:true,suite:"google-cloud-credential-unification",standard_credentials:true,standard_project:true,legacy_compatible:true,embedded_project_fallback:true}));
+  const metaResponse=await worker.fetch(new Request("https://compute.test/v1/providers/google-ee/meta"),{GOOGLE_CLOUD_CREDENTIALS:"configured",GOOGLE_CLOUD_PROJECT:"cloud-project"},{});
+  assert.equal(metaResponse.status,200);
+  const meta=await metaResponse.json();
+  assert.equal(meta.service_account_configured,true);
+  assert.equal(meta.credential_source,"google-cloud-standard");
+  assert.equal(meta.project_override_configured,true);
+  assert.equal(meta.project_override_source,"google-cloud-env");
+  assert.deepEqual(meta.accepted_credential_vars,["GOOGLE_CLOUD_CREDENTIALS","GOOGLE_EE_SERVICE_ACCOUNT_JSON"]);
+
+  console.log(JSON.stringify({ok:true,suite:"google-cloud-credential-unification",standard_credentials:true,standard_project:true,legacy_compatible:true,embedded_project_fallback:true,readiness_metadata:true}));
 }finally{globalThis.fetch=realFetch}
