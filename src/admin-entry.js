@@ -1,11 +1,9 @@
-import app,{CenterGate} from "./production-entry-baidu-p25b-e2e.js";
+import app,{CenterGate} from "./production-entry.js";
 import {getAutonomySnapshot,runAutonomySweep} from "./provider-autonomy.js";
 export {CenterGate};
 
 const ORIGIN="https://compute.internal";
 const SERVICE="compute-worker";
-const P25B_ACCEPTANCE_PATH="/__acceptance/baidu-v100-p25b-20260816-d17e5c8a4f634529b019ce72a93f1d48";
-const P25B_TRIGGER_CRON="* * * * *";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
 async function readApp(path,env,ctx){
@@ -60,10 +58,6 @@ export default{
     return app.fetch(req,env,ctx);
   },
   async scheduled(controller,env,ctx){
-    if(String(controller?.cron||"")===P25B_TRIGGER_CRON){
-      ctx.waitUntil(app.fetch(new Request(`${ORIGIN}${P25B_ACCEPTANCE_PATH}`,{method:"GET"}),env,ctx));
-      return;
-    }
     ctx.waitUntil(runAutonomySweep(app,env,ctx));
   }
 };
