@@ -3,7 +3,11 @@ const url="https://compute-worker.a15280020511.workers.dev/__diagnostic/baidu-p2
 const c=new AbortController();const timer=setTimeout(()=>c.abort(),15000);
 try{
   const r=await fetch(url,{headers:{accept:"application/json"},signal:c.signal});
-  await r.text();
-  assert.ok(r.status>=200&&r.status<300);
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24-http-2xx-class",http_2xx:true,network:true}));
+  const b=await r.json();
+  assert.equal(r.status,200);
+  assert.equal(b.diagnostic,true);
+  assert.equal(b.read_only,true);
+  assert.equal(b.operation,"CHECK");
+  assert.equal(b.gpu_submit,false);
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24-http-200-terminal",http_status:200,terminal:true,network:true}));
 }finally{clearTimeout(timer)}
