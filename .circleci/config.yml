@@ -43,10 +43,7 @@ jobs:
           name: Validate Baidu absolute startup command
           command: python bridge/baidu/bridge_entry9.py --selftest-startup
       - run:
-          name: Validate one-shot Paddle 2.5 V100 canary package
-          command: python bridge/baidu/bridge_entry25.py --selftest-p25
-      - run:
-          name: Run one-shot Paddle 2.5 V100 canary bridge
+          name: Run bounded Baidu CLI bridge
           when: always
           no_output_timeout: 10m
           environment:
@@ -54,7 +51,7 @@ jobs:
             BRIDGE_TASK_ID: << pipeline.parameters.task_id >>
             BRIDGE_BAIDU_JOB_ID: << pipeline.parameters.baidu_job_id >>
             BRIDGE_TICKET: << pipeline.parameters.bridge_ticket >>
-          command: python bridge/baidu/bridge_entry25.py
+          command: python bridge/baidu/bridge_entry9.py
 
 workflows:
   baidu-cli-bridge:
