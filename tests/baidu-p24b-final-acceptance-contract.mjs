@@ -23,7 +23,11 @@ assert.match(wrapper,/one_shot:true/);
 assert.match(wrapper,/production_promoted:false/);
 assert.match(wrapper,/runtime_production!==null/);
 assert.doesNotMatch(wrapper,/retry\s*\(/);
-assert.match(wrapper,/STATUS_PATH=/);
+assert.match(wrapper,/STATUS_PATH="\/__diagnostic\/baidu-v100-p24b-result-20260816-/);
+assert.match(wrapper,/ACCEPTANCE_EXPIRES_AT=Date\.parse\("2026-08-16T12:30:00Z"\)/);
+assert.match(wrapper,/DIAGNOSTIC_EXPIRES_AT=Date\.parse\("2026-08-16T13:30:00Z"\)/);
+assert.match(wrapper,/Date\.now\(\)>DIAGNOSTIC_EXPIRES_AT/);
+assert.match(wrapper,/Date\.now\(\)>ACCEPTANCE_EXPIRES_AT/);
 assert.match(wrapper,/baidu_job_id_present:Boolean/);
 assert.doesNotMatch(wrapper,/baidu_job_id:t\.baidu_job_id/);
 
@@ -40,4 +44,4 @@ assert.match(bridge,/"--gpus", "1"/);
 assert.match(bridge,/"--payment", "coupon"/);
 assert.doesNotMatch(bridge,/"--payment", "acoin"/);
 
-console.log(JSON.stringify({ok:true,suite:"baidu-p24b-final-acceptance-contract",runtime:"paddle2.4_py3.7",device:"v100",gpus:1,payment:"coupon",one_shot:true,bootstrap_sentinel:true,production_gate:true,automatic_retry:false}));
+console.log(JSON.stringify({ok:true,suite:"baidu-p24b-final-acceptance-contract",runtime:"paddle2.4_py3.7",device:"v100",gpus:1,payment:"coupon",one_shot:true,bootstrap_sentinel:true,production_gate:true,automatic_retry:false,acceptance_trigger_expired:true,diagnostic_status_window:true}));
