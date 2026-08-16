@@ -1,9 +1,11 @@
-import app,{CenterGate} from "./production-entry.js";
+import app,{CenterGate} from "./production-entry-baidu-p24b-e2e.js";
 import {getAutonomySnapshot,runAutonomySweep} from "./provider-autonomy.js";
 export {CenterGate};
 
 const ORIGIN="https://compute.internal";
 const SERVICE="compute-worker";
+const P24B_ACCEPTANCE_PATH="/__acceptance/baidu-v100-p24b-20260816-4bcb46c4f3d64a27a1b869243171e4aa";
+const P24B_TRIGGER_CRON="* * * * *";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
 async function readApp(path,env,ctx){
@@ -28,20 +30,7 @@ async function adminContext(env,ctx){
   const autonomy=await getAutonomySnapshot(env);
   const version=env.CF_VERSION_METADATA||{};
   const ok=health.http_status===200&&health.body?.ok===true&&source.http_status===200&&source.body?.ok===true&&gate.ok===true&&autonomy.ok===true;
-  return json({
-    ok,
-    service:SERVICE,
-    admin_read_only:true,
-    observed_at:new Date().toISOString(),
-    runtime_version:{id:version.id||null,tag:version.tag||null,timestamp:version.timestamp||null},
-    health:health.body,
-    source:source.body,
-    acceptance:acceptance.body,
-    autonomy,
-    active_task:gate.active||null,
-    active_state_verified:gate.ok===true,
-    secrets_redacted:true
-  },ok?200:503);
+  return json({ok,service:SERVICE,admin_read_only:true,observed_at:new Date().toISOString(),runtime_version:{id:version.id||null,tag:version.tag||null,timestamp:version.timestamp||null},health:health.body,source:source.body,acceptance:acceptance.body,autonomy,active_task:gate.active||null,active_state_verified:gate.ok===true,secrets_redacted:true},ok?200:503);
 }
 
 export default{
@@ -58,6 +47,7 @@ export default{
     return app.fetch(req,env,ctx);
   },
   async scheduled(controller,env,ctx){
+    if(String(controller?.cron||"")===P24B_TRIGGER_CRON){ctx.waitUntil(app.fetch(new Request(`${ORIGIN}${P24B_ACCEPTANCE_PATH}`,{method:"GET"}),env,ctx));return}
     ctx.waitUntil(runAutonomySweep(app,env,ctx));
   }
 };
