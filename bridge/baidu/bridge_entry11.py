@@ -7,6 +7,8 @@ import time
 import bridge as impl
 import bridge_entry4 as check_impl
 
+START_COMMAND = "sh run.sh"
+
 
 def shell_payload(task_id):
     return json.dumps({
@@ -38,7 +40,7 @@ def submit_and_wait_shell(task_id):
             "aistudio", "submit", "job",
             "--name", impl.expected_pipeline_name(task_id),
             "--path", str(work),
-            "--cmd", "sh run.sh",
+            "--cmd", START_COMMAND,
             "--env", "paddle2.6_py3.10",
             "--device", "v100",
             "--gpus", "1",
@@ -73,10 +75,10 @@ def selftest():
     ]:
         if needle not in script:
             raise AssertionError("SHELL_CANARY_SCRIPT_MISSING:" + needle)
+    if START_COMMAND != "sh run.sh":
+        raise AssertionError("START_COMMAND_MISMATCH")
     if impl.expected_pipeline_name(task_id) != "three-center-baidu-circleci-live-20260816k":
         raise AssertionError("PIPELINE_NAME_MISMATCH")
-    if "sh run.sh" != "sh run.sh":
-        raise AssertionError("START_COMMAND_MISMATCH")
     print(json.dumps({"ok": True, "suite": "baidu-shell-startup-canary", "cases": 6}))
     return 0
 
