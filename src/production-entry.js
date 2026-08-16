@@ -8,9 +8,18 @@ import {modalBoundedCompute} from "./modal-generic-compute.js";
 export {CenterGate};
 
 const NO_STORE={"cache-control":"no-store"};
+const MODAL_PUBLIC_HEALTH_TTL_MS=300000;
+let modalPublicHealthCache={at:0,value:null};
 const json=(body,status=200)=>Response.json(body,{status,headers:NO_STORE});
 function internalExecutionOnly(u){return u.hostname==="compute.internal"}
 function denyExternalExecution(){return json({ok:false,error:"POLICY_DENIED",message:"Modal execution routes are service-binding internal only",route_eligible:false,secret_echo:false},403)}
+async function publicModalHealth(env){
+  const t=Date.now();
+  if(modalPublicHealthCache.value&&t-modalPublicHealthCache.at<MODAL_PUBLIC_HEALTH_TTL_MS)return {...modalPublicHealthCache.value,cached_health:true,cache_ttl_ms:MODAL_PUBLIC_HEALTH_TTL_MS};
+  const value=await modalHealth(env);
+  modalPublicHealthCache={at:t,value};
+  return {...value,cached_health:false,cache_ttl_ms:MODAL_PUBLIC_HEALTH_TTL_MS};
+}
 async function requireModalLiveHealth(env){
   const health=await modalHealth(env);
   if(health.ok===true&&health.route_eligible===true)return null;
@@ -36,7 +45,7 @@ export default {
     const u=new URL(req.url);
     if(req.method==="GET"&&u.pathname==="/v1/toolkits/medical-imaging/meta")return json({ok:true,...medicalImagingMeta(),request_profile:"medical-imaging",gpu_optional:true});
     if(req.method==="GET"&&u.pathname==="/v1/providers/modal/meta")return json({ok:true,...modalMeta(),secret_echo:false});
-    if(req.method==="GET"&&u.pathname==="/v1/providers/modal/health"){const p=await modalHealth(env);return json(p,p.ok?200:503)}
+    if(req.method==="GET"&&u.pathname==="/v1/providers/modal/health"){const p=await publicModalHealth(env);return json(p,p.ok?200:503)}
     if(req.method==="POST"&&u.pathname==="/v1/providers/modal/route/plan"){
       let body={};try{body=await req.json()}catch{}
       return json({ok:true,...chooseModalAccelerator(body),execution_started:false,secret_echo:false});
