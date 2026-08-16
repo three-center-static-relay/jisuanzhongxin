@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+// Fresh read-only build instance; task B is not retriggered here.
 const url="https://compute-worker.a15280020511.workers.dev/__diagnostic/baidu-sdk039-control-result-b-20260816-02b50019f252cea7d92054e2cd44eff1";
 const c=new AbortController();
 const timer=setTimeout(()=>c.abort(),15000);
