@@ -40,8 +40,8 @@ jobs:
           name: Validate Baidu structured runtime result
           command: python bridge/baidu/job/run.py --selftest
       - run:
-          name: Validate Baidu shell startup canary
-          command: python bridge/baidu/bridge_entry11.py --selftest-shell
+          name: Validate Baidu absolute startup command
+          command: python bridge/baidu/bridge_entry9.py --selftest-startup
       - run:
           name: Run bounded Baidu CLI bridge
           when: always
@@ -51,7 +51,7 @@ jobs:
             BRIDGE_TASK_ID: << pipeline.parameters.task_id >>
             BRIDGE_BAIDU_JOB_ID: << pipeline.parameters.baidu_job_id >>
             BRIDGE_TICKET: << pipeline.parameters.bridge_ticket >>
-          command: python bridge/baidu/bridge_entry11.py
+          command: python bridge/baidu/bridge_entry9.py
 
 workflows:
   baidu-cli-bridge:
