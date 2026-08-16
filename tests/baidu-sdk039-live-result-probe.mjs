@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+// second read after the production cron had another scheduling cycle
 const url="https://compute-worker.a15280020511.workers.dev/__diagnostic/baidu-sdk039-control-result-20260816-d61c6d7be1ca4f43806ac1a021c1d8e8";
 const c=new AbortController();
 const timer=setTimeout(()=>c.abort(),15000);
