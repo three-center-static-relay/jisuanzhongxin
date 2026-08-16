@@ -7,5 +7,7 @@ try{
   assert.equal(r.status,200);
   assert.equal(b.status,"failed");
   assert.equal(b.failure_class,"BAIDU_JOB_TERMINAL_FAILED");
-  console.log(JSON.stringify({ok:true,suite:"baidu-p24-exact-terminal-failure",failure_class:"BAIDU_JOB_TERMINAL_FAILED",network:true}));
+  assert.ok(b.upstream_diagnostic&&typeof b.upstream_diagnostic==="object"&&!Array.isArray(b.upstream_diagnostic));
+  assert.ok(Object.keys(b.upstream_diagnostic).length>0);
+  console.log(JSON.stringify({ok:true,suite:"baidu-p24-upstream-diagnostic-present",upstream_diagnostic_present:true,network:true}));
 }finally{clearTimeout(timer)}
