@@ -2,10 +2,13 @@ import {registrySummary,domainModels,MODEL_REGISTRY,PACKAGE_STACKS,allModelIds} 
 import {runLocalModel,localModelMeta,LOCAL_MODELS} from "./local-models.js";
 import {dispatch} from "./kaggle-official.js";
 import {recipeFor,recipeMeta} from "./model-recipe-router.js";
+import {commercialSpatialExecutableModel,commercialSpatialExecutableModelIds} from "./commercial-spatial-executable-models.js";
 import {INDUSTRY_PACKS,STANDARD_WORKFLOWS,industrySummary,industryPack} from "./industry-packs.js";
 const MAX_BODY_BYTES=65536,DEFAULT_RATE=30;
 const REGISTRY_IDS=Object.freeze(allModelIds());
 const REGISTRY_SET=new Set(REGISTRY_IDS);
+const EXECUTABLE_SPATIAL_IDS=Object.freeze(commercialSpatialExecutableModelIds());
+const EXECUTABLE_SPATIAL_SET=new Set(EXECUTABLE_SPATIAL_IDS);
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
 const error=(code,message,status=400,details)=>json({ok:false,error:code,message,...(details?{details}:{})},status);
 const now=()=>new Date().toISOString();
@@ -14,7 +17,7 @@ async function digest(v){const h=await crypto.subtle.digest("SHA-256",new TextEn
 async function parse(req){const n=Number(req.headers.get("content-length")||0);if(n>MAX_BODY_BYTES)throw Object.assign(new Error("BODY_TOO_LARGE"),{status:413});const t=await req.text();if(new TextEncoder().encode(t).length>MAX_BODY_BYTES)throw Object.assign(new Error("BODY_TOO_LARGE"),{status:413});try{return t?JSON.parse(t):{}}catch{throw Object.assign(new Error("INVALID_REQUEST"),{status:400})}}
 function gate(env){return env.CENTER_GATE.get(env.CENTER_GATE.idFromName("global"))}
 async function g(env,path,method="GET",body){const init={method,headers:{"content-type":"application/json"}};if(body!==undefined)init.body=JSON.stringify(body);const r=await gate(env).fetch(new Request(`https://gate.internal${path}`,init));return{http:r.status,...await r.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}))}}
-function canonicalModelId(raw){const s=String(raw||"").trim();if(!s)throw Object.assign(new Error("MODEL_ID_REQUIRED"),{status:400});if(LOCAL_MODELS[s])return{canonical:s,local_id:s,source:"local"};if(REGISTRY_SET.has(s))return{canonical:s,local_id:null,source:"registry"};const matches=REGISTRY_IDS.filter(x=>x.endsWith(`.${s}`));if(matches.length===1)return{canonical:matches[0],local_id:null,source:"registry-alias"};if(matches.length>1)throw Object.assign(new Error("AMBIGUOUS_MODEL_ID"),{status:400,details:{model_id:s,matches:matches.slice(0,25)}});throw Object.assign(new Error("UNKNOWN_MODEL"),{status:400,details:{model_id:s}})}
+export function canonicalModelId(raw){const s=String(raw||"").trim();if(!s)throw Object.assign(new Error("MODEL_ID_REQUIRED"),{status:400});if(LOCAL_MODELS[s])return{canonical:s,local_id:s,source:"local"};if(REGISTRY_SET.has(s))return{canonical:s,local_id:null,source:"registry"};if(EXECUTABLE_SPATIAL_SET.has(s))return{canonical:s,local_id:null,source:"approved-recipe-catalog"};const matches=REGISTRY_IDS.filter(x=>x.endsWith(`.${s}`));const spatialMatches=EXECUTABLE_SPATIAL_IDS.filter(x=>x.endsWith(`.${s}`));const all=[...new Set([...matches,...spatialMatches])];if(all.length===1)return{canonical:all[0],local_id:null,source:spatialMatches.includes(all[0])?"approved-recipe-alias":"registry-alias"};if(all.length>1)throw Object.assign(new Error("AMBIGUOUS_MODEL_ID"),{status:400,details:{model_id:s,matches:all.slice(0,25)}});throw Object.assign(new Error("UNKNOWN_MODEL"),{status:400,details:{model_id:s}})}
 async function run(req,env){
   if(new URL(req.url).hostname!=="compute.internal")return error("POLICY_DENIED","Model execution is service-binding internal only",403);
   const rate=await g(env,"/rate","POST",{limit:int(env.RATE_LIMIT_PER_MIN,DEFAULT_RATE)});if(!rate.ok)return error("RATE_LIMITED","Compute budget exceeded",429,rate);
@@ -42,7 +45,7 @@ async function run(req,env){
   }
 }
 export async function maybeHandleModels(req,env){const u=new URL(req.url);
-  if(req.method==="GET"&&u.pathname==="/v1/models")return json({ok:true,...registrySummary(),local:localModelMeta(),recipes:recipeMeta(),industries:industrySummary(),execution_policy:{local:"synchronous-bounded",kaggle_recipe:"async-fixed-template-no-internet",unimplemented:"fail-closed",arbitrary_code:false}});
+  if(req.method==="GET"&&u.pathname==="/v1/models")return json({ok:true,...registrySummary(),local:localModelMeta(),recipes:recipeMeta(),approved_recipe_models:EXECUTABLE_SPATIAL_IDS.map(id=>({id,...commercialSpatialExecutableModel(id)})),industries:industrySummary(),execution_policy:{local:"synchronous-bounded",kaggle_recipe:"async-fixed-template-no-internet",unimplemented:"fail-closed",arbitrary_code:false}});
   if(req.method==="GET"&&u.pathname==="/v1/models/package-stacks")return json({ok:true,package_stacks:PACKAGE_STACKS,runtime_state:"package-audit-gated",recipes:recipeMeta()});
   if(req.method==="GET"&&u.pathname==="/v1/models/local/meta")return json({ok:true,...localModelMeta()});
   if(req.method==="GET"&&u.pathname==="/v1/models/industries")return json({ok:true,...industrySummary(),workflows:STANDARD_WORKFLOWS});
