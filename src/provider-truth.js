@@ -1,3 +1,5 @@
+import {KAGGLE_ACCEPTANCE_HISTORY} from "./kaggle-acceptance-history.js";
+
 const SUMMARY_PATHS=new Set(["/health","/v1/capabilities","/capabilities"]);
 const KAGGLE_HISTORICAL_STATE="historical-cpu-t4-e2e-live-health-required";
 const MODAL_HISTORICAL_STATE="historical-cpu-t4-e2e-live-health-required";
@@ -11,7 +13,8 @@ export function normalizeKaggleMeta(body={}){
     current_live_health_verified:false,
     route_eligible:false,
     route_eligibility:"live-health-required",
-    acceptance_state:KAGGLE_HISTORICAL_STATE
+    acceptance_state:KAGGLE_HISTORICAL_STATE,
+    latest_recipe_acceptance:KAGGLE_ACCEPTANCE_HISTORY.latest_recipe_attempt
   };
 }
 
@@ -24,7 +27,8 @@ export function normalizeKaggleHealth(body={}){
     business_e2e_historically_verified:true,
     current_live_health_verified:live,
     route_eligible:live&&body?.route_eligible===true,
-    acceptance_state:live?"live-auth-health-pass-historical-cpu-t4-e2e":"live-health-failed"
+    acceptance_state:live?"live-auth-health-pass-historical-cpu-t4-e2e":"live-health-failed",
+    latest_recipe_acceptance:KAGGLE_ACCEPTANCE_HISTORY.latest_recipe_attempt
   };
 }
 
@@ -64,7 +68,8 @@ function normalizeSummary(body){
         current_live_health_verified:false,
         route_eligible:false,
         route_eligibility:"live-health-required",
-        acceptance_state:KAGGLE_HISTORICAL_STATE
+        acceptance_state:KAGGLE_HISTORICAL_STATE,
+        latest_recipe_acceptance:KAGGLE_ACCEPTANCE_HISTORY.latest_recipe_attempt
       };
     }
     if(out.compute_backends.modal){
@@ -97,7 +102,7 @@ export function normalizeProviderTruth(path,body){
   if(SUMMARY_PATHS.has(path))return normalizeSummary(body);
   if(path==="/v1/acceptance/latest"&&body.providers&&typeof body.providers==="object"){
     return {...body,providers:{...body.providers,
-      kaggle:"historical-cpu-t4-e2e-live-health-required-current-e2e-not-asserted",
+      kaggle:"historical-cpu-t4-e2e-live-health-required-current-e2e-not-asserted-latest-recipe-task-not-created",
       modal:"historical-cpu-t4-e2e-live-health-required-bounded-route-current-e2e-not-asserted"
     }};
   }
