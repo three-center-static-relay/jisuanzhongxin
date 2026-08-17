@@ -1,5 +1,6 @@
 import app,{CenterGate} from "./production-entry.js";
 import {getAutonomySnapshot,runAutonomySweep} from "./provider-autonomy.js";
+import {getModelScopeRuntimeSnapshot,runModelScopeRuntimeSweep} from "./modelscope-runtime-monitor.js";
 export {CenterGate};
 
 const ORIGIN="https://compute.internal";
@@ -26,9 +27,10 @@ async function adminContext(env,ctx){
   const acceptance=await readApp("/v1/acceptance/latest",env,ctx);
   const gate=await readGate(env);
   const autonomy=await getAutonomySnapshot(env);
+  const modelscopeRuntime=await getModelScopeRuntimeSnapshot(env);
   const version=env.CF_VERSION_METADATA||{};
   const ok=health.http_status===200&&health.body?.ok===true&&source.http_status===200&&source.body?.ok===true&&gate.ok===true&&autonomy.ok===true;
-  return json({ok,service:SERVICE,admin_read_only:true,observed_at:new Date().toISOString(),runtime_version:{id:version.id||null,tag:version.tag||null,timestamp:version.timestamp||null},health:health.body,source:source.body,acceptance:acceptance.body,autonomy,active_task:gate.active||null,active_state_verified:gate.ok===true,secrets_redacted:true},ok?200:503);
+  return json({ok,service:SERVICE,admin_read_only:true,observed_at:new Date().toISOString(),runtime_version:{id:version.id||null,tag:version.tag||null,timestamp:version.timestamp||null},health:health.body,source:source.body,acceptance:acceptance.body,autonomy,modelscope_runtime:modelscopeRuntime,alerts:{user_action_required:modelscopeRuntime?.status?.user_action_required===true,modelscope:modelscopeRuntime?.status?.hard_alerts||[]},active_task:gate.active||null,active_state_verified:gate.ok===true,secrets_redacted:true},ok?200:503);
 }
 
 export default{
@@ -42,9 +44,13 @@ export default{
       if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"autonomy status is service-binding internal only"},403);
       return json(await getAutonomySnapshot(env));
     }
+    if(req.method==="GET"&&url.pathname==="/v1/admin/modelscope"){
+      if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"ModelScope runtime status is service-binding internal only"},403);
+      return json(await getModelScopeRuntimeSnapshot(env));
+    }
     return app.fetch(req,env,ctx);
   },
   async scheduled(_controller,env,ctx){
-    ctx.waitUntil(runAutonomySweep(app,env,ctx));
+    ctx.waitUntil(Promise.all([runAutonomySweep(app,env,ctx),runModelScopeRuntimeSweep(env)]));
   }
 };
