@@ -14,12 +14,12 @@ try {
   assert.equal(body.task?.status,"failed");
   assert.equal(body.task?.runtime_candidate,"paddle2.4_py3.7");
   assert.equal(body.task?.sdk_candidate,"0.3.9");
-  assert.equal(body.task?.failure_class,"BAIDU_JOB_RUNTIME_PROCESS_TERMINAL_FAILED");
+  assert.equal(body.task?.failure_class,"BAIDU_JOB_BOOTSTRAP_INTERRUPTED");
   assert.equal(body.task?.bridge_stage,"result_polling");
   assert.equal(body.task?.result_digest,null);
   assert.equal(body.task?.bridge_result_retrieved,false);
   assert.equal(body.task?.production_promoted,false);
-  console.log(JSON.stringify({ok:true,suite:"diag-p24c-sdk039-runtime-process-terminal",task_id:body.task.task_id,status:body.task.status,failure_class:body.task.failure_class,bridge_stage:body.task.bridge_stage,upstream_diagnostic:body.task.upstream_diagnostic||null,runtime:body.task.runtime_candidate,sdk_version:body.task.sdk_candidate,production_promoted:body.task.production_promoted}));
+  console.log(JSON.stringify({ok:true,suite:"diag-p24c-sdk039-bootstrap-interrupted",task_id:body.task.task_id,status:body.task.status,failure_class:body.task.failure_class,bridge_stage:body.task.bridge_stage,upstream_diagnostic:body.task.upstream_diagnostic||null,runtime:body.task.runtime_candidate,sdk_version:body.task.sdk_candidate,production_promoted:body.task.production_promoted}));
 } finally {
   clearTimeout(timer);
 }
