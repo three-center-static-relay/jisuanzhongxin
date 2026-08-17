@@ -44,7 +44,7 @@ assert.equal(ev.bridge_result_retrieved,false);
 assert.equal(ev.v100_cuda_verified,false);
 assert.equal(ev.production_promoted,false);
 
-assert.match(admin,/from "\.\/production-entry\.js"/);
+assert.match(admin,/from "\.\/production-entry(?:-kaggle-robust-site-e2e)?\.js"/);
 assert.doesNotMatch(admin,/production-entry-baidu-p24c-sdk039-e2e\.js/);
 assert.equal(fs.existsSync(wrapperUrl),false);
 assert.doesNotMatch(baidu,/candidate_sdk_acceptance/);
@@ -57,4 +57,4 @@ assert.doesNotMatch(bridge,/"--payment", "acoin"/);
 assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
 assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
 
-console.log(JSON.stringify({ok:true,suite:"baidu-p24c-sdk039-final-contract",task_id:ev.task_id,runtime:ev.runtime,sdk_version:ev.sdk_version,intended_v100:1,payment:ev.payment,state:ev.state,failure_class:ev.failure_class,bridge_stage:ev.bridge_stage,circleci_pipeline_created:ev.circleci_pipeline_created,aistudio_auth_verified:ev.aistudio_auth_verified,aistudio_submit_returned:ev.aistudio_submit_returned,baidu_job_id_confirmed:ev.baidu_job_id_confirmed,gpu_job_confirmed:ev.gpu_job_confirmed,result_digest_present:ev.result_digest_present,bridge_result_retrieved:ev.bridge_result_retrieved,v100_cuda_verified:ev.v100_cuda_verified,production_promoted:ev.production_promoted,p24c_wrapper_removed:true,candidate_submit_removed:true,normal_submit_sdk:"0.3.8",production_runtime:null,route_eligible:false}));
+console.log(JSON.stringify({ok:true,suite:"baidu-p24c-sdk039-final-contract",task_id:ev.task_id,runtime:ev.runtime,sdk_version:ev.sdk_version,intended_v100:1,payment:ev.payment,state:ev.state,failure_class:ev.failure_class,bridge_stage:ev.bridge_stage,circleci_pipeline_created:ev.circleci_pipeline_created,aistudio_auth_verified:ev.aistudio_auth_verified,aistudio_submit_returned:ev.aistudio_submit_returned,baidu_job_id_confirmed:ev.baidu_job_id_confirmed,gpu_job_confirmed:ev.gpu_job_confirmed,result_digest_present:ev.result_digest_present,bridge_result_retrieved:ev.bridge_result_retrieved,v100_cuda_verified:ev.v100_cuda_verified,production_promoted:ev.production_promoted,p24c_wrapper_removed:true,candidate_submit_removed:true,normal_submit_sdk:"0.3.8",production_runtime:null,route_eligible:false,temporary_kaggle_acceptance_wrapper_allowed:true}));
