@@ -1,7 +1,10 @@
 {
   "name": "compute-worker",
   "private": true,
-  "scripts": {"stress": "node tests/stress.mjs"},
+  "scripts": {
+    "stress": "node tests/stress.mjs",
+    "test:inference-hardening": "node tests/inference-hardening.mjs"
+  },
   "devDependencies": {
     "wrangler": "^4.0.0",
     "msw": "^2.0.0"
