@@ -1,6 +1,6 @@
 const API="https://api-inference.modelscope.cn/v1/chat/completions";
 const MODEL="Qwen/Qwen3.5-27B";
-const CANARY_REVISION="qwen3.5-27b-stream-math-v3-20260817";
+const CANARY_REVISION="qwen3.5-27b-stream-math-v3r2-20260817";
 const TIMEOUT_MS=45000;
 const str=v=>String(v??"").trim();
 function token(env={}){return str(env.MODELSCOPE_API_TOKEN)||str(env.MODELSCOPE_TOKEN)}
