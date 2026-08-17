@@ -1,6 +1,7 @@
 const TOKEN_URL="https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const CORE_BASE="https://openeo.dataspace.copernicus.eu/openeo/1.2";
 const FED_BASE="https://openeofed.dataspace.copernicus.eu/openeo/1.2";
+const OIDC_PROVIDER_ID="CDSE";
 let cached={access_token:"",expires_at:0};
 
 function cfg(env){
@@ -36,7 +37,7 @@ async function accessToken(env){
   return {configured:true,token:cached.access_token,cached:false};
 }
 
-const authHeaders=t=>({authorization:`Bearer ${t}`});
+const authHeaders=t=>({authorization:`Bearer oidc/${OIDC_PROVIDER_ID}/${t}`});
 
 export async function probeOpenEO(env,{federated=false}={}){
   const a=await accessToken(env);
@@ -69,6 +70,7 @@ export const openEOMeta=()=>({
   core_endpoint:CORE_BASE,
   federation_endpoint:FED_BASE,
   auth:"oidc-client-credentials",
+  oidc_provider_id:OIDC_PROVIDER_ID,
   machine_to_machine:true,
   generic_python:false,
   processing_class:"earth-observation-datacube"
