@@ -3,10 +3,12 @@ import {getAutonomySnapshot,runAutonomySweep} from "./provider-autonomy.js";
 import {getModelScopeRuntimeSnapshot,runModelScopeRuntimeSweep} from "./modelscope-runtime-monitor.js";
 import {probeModelScope} from "./modelscope-compute.js";
 import {modelScopeInferenceCanary} from "./modelscope-inference.js";
+import {getModelScopeStudioStatus,runModelScopeStudioBootstrap} from "./modelscope-studio.js";
 export {CenterGate};
 
 const ORIGIN="https://compute.internal";
 const SERVICE="compute-worker";
+const STUDIO_BOOTSTRAP_CRON="*/5 * * * *";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
 async function readApp(path,env,ctx){
@@ -71,6 +73,11 @@ async function modelScopeInferenceSelftest(env){
   },p.ok===true?200:503);
 }
 
+async function modelScopeStudioSelftest(env){
+  const p=await getModelScopeStudioStatus(env);
+  return json(p,p.runtime_e2e_verified===true?200:503);
+}
+
 async function adminContext(env,ctx){
   const health=await readApp("/health",env,ctx);
   const source=await readApp("/source",env,ctx);
@@ -88,6 +95,7 @@ export default{
     const url=new URL(req.url);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-runtime")return modelScopeRuntimeSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-inference")return modelScopeInferenceSelftest(env);
+    if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio")return modelScopeStudioSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/admin/context"){
       if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"admin context is service-binding internal only"},403);
       return adminContext(env,ctx);
@@ -100,9 +108,18 @@ export default{
       if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"ModelScope runtime status is service-binding internal only"},403);
       return json(await getModelScopeRuntimeSnapshot(env));
     }
+    if(req.method==="POST"&&url.pathname==="/v1/admin/modelscope/studio-bootstrap"){
+      if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"ModelScope Studio bootstrap is service-binding internal only"},403);
+      const result=await runModelScopeStudioBootstrap(env);
+      return json(result,result.ok===true?200:503);
+    }
     return app.fetch(req,env,ctx);
   },
-  async scheduled(_controller,env,ctx){
+  async scheduled(controller,env,ctx){
+    if(controller?.cron===STUDIO_BOOTSTRAP_CRON){
+      ctx.waitUntil(runModelScopeStudioBootstrap(env));
+      return;
+    }
     ctx.waitUntil(Promise.all([runAutonomySweep(app,env,ctx),runModelScopeRuntimeSweep(env)]));
   }
 };
