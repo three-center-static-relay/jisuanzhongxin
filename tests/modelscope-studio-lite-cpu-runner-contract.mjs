@@ -23,18 +23,41 @@ for(const literal of [
   "/logs/run",
   "THREE_CENTER_MODELSCOPE_LITE_RUNTIME:",
   "square_sum_correct",
-  "result_digest"
+  "result_digest",
+  "prepareModelScopeStudioLite",
+  "deployModelScopeStudioLite",
+  "stopModelScopeStudioLite",
+  'commitAppAction(t,owner,\"update\")',
+  'commitAppAction(t,owner,\"create\")',
+  "stop_requires_hardware_catalog:false",
+  "phased_runner:true",
+  "idempotent_upload:true"
 ]) assert.ok(studio.includes(literal),`Missing Studio Lite safety contract: ${literal}`);
 
 for(const literal of [
   "/v1/selftest/modelscope-studio-lite",
+  "/v1/admin/modelscope/studio-lite/status",
+  "/v1/admin/modelscope/studio-lite/prepare",
+  "/v1/admin/modelscope/studio-lite/deploy",
+  "/v1/admin/modelscope/studio-lite/stop",
+  "/v1/admin/modelscope/studio-lite-bootstrap",
+  "/v1/admin/modelscope/studio-lite/run",
+  "/v1/admin/modelscope/studio-lite/workflow",
+  "MODELSCOPE_STUDIO_WORKFLOW",
+  "compute.internal"
+]) assert.ok(entry.includes(literal),`Missing Studio Lite internal control-plane contract: ${literal}`);
+
+for(const forbidden of [
+  "/v1/selftest/modelscope-studio-lite-prepare-once",
+  "/v1/selftest/modelscope-studio-lite-deploy-once",
+  "/v1/selftest/modelscope-studio-lite-stop-once",
   "/v1/selftest/modelscope-studio-lite-bootstrap-once",
   "studio-lite-once-v1-20260817",
-  "/v1/admin/modelscope/studio-lite-bootstrap",
-  "url.hostname!==\"compute.internal\""
-]) assert.ok(entry.includes(literal),`Missing Studio Lite control-plane contract: ${literal}`);
+  "studio-lite-once-v2-20260817"
+]) assert.ok(!entry.includes(forbidden),`Public Studio Lite write surface must be absent: ${forbidden}`);
 
-assert.ok(!wrangler.includes("*/5 * * * *"),"Studio Lite acceptance must not install a recurring 5-minute bootstrap cron");
+assert.ok(!wrangler.includes("*/5 * * * *"),"Studio Lite must not install a recurring 5-minute bootstrap cron");
 assert.ok(!entry.includes('req.method===\"POST\"&&url.pathname===\"/v1/selftest/modelscope-studio-lite\"'),"Public Studio Lite status endpoint must remain read-only");
+assert.ok(entry.indexOf('url.pathname===\"/v1/admin/modelscope/studio-lite/stop\"')>=0,"Internal emergency stop route must exist");
 
-console.log(JSON.stringify({ok:true,suite:"modelscope-studio-lite-cpu-runner-contract",module_imported:true,target_hardware:"platform/2v-cpu-16g-mem",nominal_cpu:2,nominal_memory_gb:16,min_effective_cpu:1.9,min_effective_memory_gib:14,free_only:true,paid_fallback:false,private_studio:true,fixed_one_shot_gate:true,recurring_bootstrap:false}));
+console.log(JSON.stringify({ok:true,suite:"modelscope-studio-lite-cpu-runner-contract",module_imported:true,target_hardware:"platform/2v-cpu-16g-mem",nominal_cpu:2,nominal_memory_gb:16,min_effective_cpu:1.9,min_effective_memory_gib:14,free_only:true,paid_fallback:false,private_studio:true,phased_runner:true,idempotent_upload:true,stop_independent_of_hardware_catalog:true,public_write_surface:false,internal_workflow_control:true,recurring_bootstrap:false}));
