@@ -44,7 +44,7 @@ assert.equal(BAIDU_RUNTIME_POLICY.automatic_same_failure_retry,false);
 assert.equal(BAIDU_RUNTIME_POLICY.quarantine_evidence["paddle2.4_py3.7"].live_e2e_failures,3);
 assert.equal(BAIDU_RUNTIME_POLICY.quarantine_evidence["paddle2.4_py3.7"].latest_failure_class,"BAIDU_COMPUTE_CREDIT_INSUFFICIENT");
 
-assert.match(admin,/from "\.\/production-entry(?:-kaggle-robust-site-e2e)?\.js"/);
+assert.match(admin,/from "\.\/production-entry\.js"/);
 assert.doesNotMatch(admin,/production-entry-baidu-sdk039-selftest\.js/);
 assert.doesNotMatch(admin,/production-entry-baidu-p24c-sdk039-e2e\.js/);
 assert.equal(fs.existsSync(oldSdkWrapperUrl),false);
@@ -72,4 +72,4 @@ assert.doesNotMatch(bridge,/"--payment", "acoin"/);
 assert.match(runtime,/nvidia-smi/);
 assert.match(runtime,/paddle\.device\.is_compiled_with_cuda\(\)/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,scheduled_gpu_canary:false,baidu_candidate_state:"QUARANTINED",live_e2e_failures:3,latest_failure_class:"BAIDU_COMPUTE_CREDIT_INSUFFICIENT",baidu_job_id_confirmed:false,v100_cuda_verified:false,production_runtime:null,route_eligible:false,automatic_candidate_execution:false,automatic_same_failure_retry:false,p24c_wrapper_removed:true,sdk039_candidate_submit_removed:true,temporary_kaggle_acceptance_wrapper_allowed:true}));
+console.log(JSON.stringify({ok:true,suite:"provider-autonomy-contract",free_only:true,scheduled_gpu_canary:false,baidu_candidate_state:"QUARANTINED",live_e2e_failures:3,latest_failure_class:"BAIDU_COMPUTE_CREDIT_INSUFFICIENT",baidu_job_id_confirmed:false,v100_cuda_verified:false,production_runtime:null,route_eligible:false,automatic_candidate_execution:false,automatic_same_failure_retry:false,p24c_wrapper_removed:true,sdk039_candidate_submit_removed:true}));
