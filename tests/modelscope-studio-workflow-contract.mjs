@@ -29,9 +29,8 @@ for(const literal of [
   '"workflows"',
   '"name":"modelscope-studio-lite-runner"',
   '"binding":"MODELSCOPE_STUDIO_WORKFLOW"',
-  '"class_name":"ModelScopeStudioLiteWorkflow"',
-  '"schedules":["*/5 * * * *"]'
-]) assert.ok(wrangler.includes(literal),`Missing temporary Workflow acceptance binding: ${literal}`);
+  '"class_name":"ModelScopeStudioLiteWorkflow"'
+]) assert.ok(wrangler.includes(literal),`Missing Workflow binding: ${literal}`);
 
 for(const literal of [
   'export {CenterGate,ModelScopeStudioLiteWorkflow}',
@@ -40,11 +39,11 @@ for(const literal of [
   'url.hostname!=="compute.internal"'
 ]) assert.ok(entry.includes(literal),`Missing internal Workflow control contract: ${literal}`);
 
-assert.equal((wrangler.match(/"schedules"/g)||[]).length,1,"Acceptance build must contain exactly one Workflow schedules field");
-assert.ok(!entry.includes('/v1/selftest/modelscope-studio-lite-workflow-once'),"Public Workflow trigger must remain absent during acceptance");
+assert.ok(!wrangler.includes('"schedules"'),"Permanent Studio Lite Workflow must remain demand-driven");
+assert.ok(!entry.includes('/v1/selftest/modelscope-studio-lite-workflow-once'),"Public Workflow trigger must remain absent");
 assert.ok(!workflow.includes('retries:{limit:5'),"Workflow must not inherit high retry amplification under the Free 50-subrequest budget");
 assert.ok(workflow.includes('const ONE_ATTEMPT={retries:{limit:1'),"Prepare/deploy attempts must stay single-attempt");
 assert.ok(workflow.includes('const STATUS_ATTEMPT={retries:{limit:1'),"Status reads must stay single-attempt");
 assert.ok(workflow.includes('const STOP_RETRY={retries:{limit:2'),"Stop may retry once but must remain bounded");
 
-console.log(JSON.stringify({ok:true,suite:"modelscope-studio-workflow-contract",workflow:"modelscope-studio-lite-runner",binding:"MODELSCOPE_STUDIO_WORKFLOW",temporary_acceptance_schedule:"*/5 * * * *",public_trigger:false,idempotent_acceptance_guard:true,poll_rounds:5,poll_sleep_seconds:20,subrequest_budget_max:50,explicit_stop:true,rollback_stop:true,free_only:true,paid_fallback:false}));
+console.log(JSON.stringify({ok:true,suite:"modelscope-studio-workflow-contract",workflow:"modelscope-studio-lite-runner",binding:"MODELSCOPE_STUDIO_WORKFLOW",demand_driven:true,public_trigger:false,idempotent_acceptance_guard:true,poll_rounds:5,poll_sleep_seconds:20,subrequest_budget_max:50,explicit_stop:true,rollback_stop:true,free_only:true,paid_fallback:false}));
