@@ -9,6 +9,7 @@ export {CenterGate};
 const ORIGIN="https://compute.internal";
 const SERVICE="compute-worker";
 const STUDIO_BOOTSTRAP_CRON="*/5 * * * *";
+const STUDIO_BOOTSTRAP_ONCE_HEADER="studio-cpu-once-v1-20260817";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
 async function readApp(path,env,ctx){
@@ -78,6 +79,12 @@ async function modelScopeStudioSelftest(env){
   return json(p,p.runtime_e2e_verified===true?200:503);
 }
 
+async function modelScopeStudioBootstrapOnce(req,env){
+  if(req.headers.get("x-three-center-selftest")!==STUDIO_BOOTSTRAP_ONCE_HEADER)return json({ok:false,error:"POLICY_DENIED",selftest:"modelscope-studio-bootstrap-once",free_only:true,paid_fallback:false,secrets_redacted:true},403);
+  const p=await runModelScopeStudioBootstrap(env);
+  return json({...p,selftest:"modelscope-studio-bootstrap-once",free_only:true,paid_fallback:false,secrets_redacted:true},p.ok===true?200:503);
+}
+
 async function adminContext(env,ctx){
   const health=await readApp("/health",env,ctx);
   const source=await readApp("/source",env,ctx);
@@ -96,6 +103,7 @@ export default{
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-runtime")return modelScopeRuntimeSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-inference")return modelScopeInferenceSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio")return modelScopeStudioSelftest(env);
+    if(req.method==="POST"&&url.pathname==="/v1/selftest/modelscope-studio-bootstrap-once")return modelScopeStudioBootstrapOnce(req,env);
     if(req.method==="GET"&&url.pathname==="/v1/admin/context"){
       if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"admin context is service-binding internal only"},403);
       return adminContext(env,ctx);
