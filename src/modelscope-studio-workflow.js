@@ -7,9 +7,34 @@ const ONE_ATTEMPT={retries:{limit:1,delay:"1 second"},timeout:"2 minutes"};
 const STATUS_ATTEMPT={retries:{limit:1,delay:"1 second"},timeout:"45 seconds"};
 const STOP_RETRY={retries:{limit:2,delay:"5 seconds",backoff:"linear"},timeout:"1 minute"};
 const err=(stage,r)=>new Error(`${stage}:${r?.error_class||r?.stage||"FAILED"}`);
+const verifiedV2=s=>s?.runtime_e2e_verified===true&&s?.hardware?.name===TARGET&&s?.hardware?.resource_type==="free"&&s?.runtime_receipt?.revision===REVISION;
 
 export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
   async run(event,step){
+    const prior=await step.do("check prior verified Studio receipt",STATUS_ATTEMPT,async()=>getModelScopeStudioLiteStatus(this.env));
+    if(verifiedV2(prior)){
+      const stopped=await step.do("ensure previously verified Studio is stopped",STOP_RETRY,async()=>{
+        const s=await stopModelScopeStudioLite(this.env);
+        if(s?.ok!==true)throw err("stop-prior",s);
+        return s;
+      });
+      return{
+        ok:true,
+        stage:"already-verified",
+        runner:"modelscope-studio-lite-workflow",
+        workflow_instance_id:event.instanceId,
+        target_hardware:TARGET,
+        resource_type:"free",
+        runtime_receipt:prior.runtime_receipt,
+        stopped:{http_status:stopped.stop_http_status||null},
+        subrequest_budget_max:50,
+        polling_rounds_max:5,
+        free_only:true,
+        paid_fallback:false,
+        secrets_redacted:true
+      };
+    }
+
     let prepared=null,deployed=null,verified=null,failure=null,stopped=null;
     try{
       prepared=await step.do("prepare Studio Lite",ONE_ATTEMPT,async()=>{
@@ -37,16 +62,15 @@ export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
         }
       );
 
-      for(let i=0;i<6;i++){
+      for(let i=0;i<5;i++){
         await step.sleep(`wait for Studio runtime ${i+1}`,"20 seconds");
         const s=await step.do(`inspect Studio receipt ${i+1}`,STATUS_ATTEMPT,async()=>getModelScopeStudioLiteStatus(this.env));
-        if(s?.runtime_e2e_verified===true&&s?.hardware?.name===TARGET&&s?.hardware?.resource_type==="free"){
+        if(verifiedV2(s)){
           verified=s;
           break;
         }
       }
       if(!verified)throw new Error("verify:MODELSCOPE_STUDIO_LITE_RUNTIME_E2E_FAILED");
-      if(verified?.runtime_receipt?.revision!==REVISION)throw new Error("verify:RUNTIME_REVISION_MISMATCH");
     }catch(e){
       failure=String(e?.message||e||"WORKFLOW_FAILED");
     }
@@ -64,6 +88,7 @@ export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
 
     return{
       ok:true,
+      stage:"runtime-verified",
       runner:"modelscope-studio-lite-workflow",
       workflow_instance_id:event.instanceId,
       target_hardware:TARGET,
@@ -73,7 +98,7 @@ export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
       deployed:{http_status:deployed.deploy_http_status||null},
       stopped:{http_status:stopped.stop_http_status||null},
       subrequest_budget_max:50,
-      polling_rounds_max:6,
+      polling_rounds_max:5,
       free_only:true,
       paid_fallback:false,
       secrets_redacted:true
