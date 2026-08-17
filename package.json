@@ -1,11 +1,13 @@
 {
   "name": "compute-worker",
   "private": true,
+  "type": "module",
   "scripts": {
     "stress": "node tests/stress.mjs",
     "test:inference-hardening": "node tests/inference-hardening.mjs",
     "test:commercial-spatial-advanced": "node tests/commercial-spatial-advanced.mjs",
-    "test:commercial-spatial-signal": "node tests/commercial-spatial-signal.mjs"
+    "test:commercial-spatial-signal": "node tests/commercial-spatial-signal.mjs",
+    "test:capability-manifest": "node tests/capability-manifest-contract.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0",
