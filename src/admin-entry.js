@@ -4,6 +4,7 @@ import {getModelScopeRuntimeSnapshot,runModelScopeRuntimeSweep} from "./modelsco
 import {probeModelScope} from "./modelscope-compute.js";
 import {modelScopeInferenceCanary} from "./modelscope-inference.js";
 import {getModelScopeStudioStatus,runModelScopeStudioBootstrap} from "./modelscope-studio.js";
+import {getModelScopeStudioHardwareShape} from "./modelscope-studio-hardware-debug.js";
 export {CenterGate};
 
 const ORIGIN="https://compute.internal";
@@ -103,6 +104,7 @@ export default{
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-runtime")return modelScopeRuntimeSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-inference")return modelScopeInferenceSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio")return modelScopeStudioSelftest(env);
+    if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio-hardware-shape")return json(await getModelScopeStudioHardwareShape(env));
     if(req.method==="POST"&&url.pathname==="/v1/selftest/modelscope-studio-bootstrap-once")return modelScopeStudioBootstrapOnce(req,env);
     if(req.method==="GET"&&url.pathname==="/v1/admin/context"){
       if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"admin context is service-binding internal only"},403);
