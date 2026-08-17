@@ -2,6 +2,7 @@ import app,{CenterGate} from "./production-entry.js";
 import {getAutonomySnapshot,runAutonomySweep} from "./provider-autonomy.js";
 import {getModelScopeRuntimeSnapshot,runModelScopeRuntimeSweep} from "./modelscope-runtime-monitor.js";
 import {probeModelScope} from "./modelscope-compute.js";
+import {modelScopeInferenceCanary} from "./modelscope-inference.js";
 export {CenterGate};
 
 const ORIGIN="https://compute.internal";
@@ -44,6 +45,11 @@ async function modelScopeRuntimeSelftest(env){
   },ok?200:503);
 }
 
+async function modelScopeInferenceSelftest(env){
+  const p=await modelScopeInferenceCanary(env);
+  return json({ok:p.ok===true,selftest:"modelscope-inference",secret_present:p.configured===true,authenticated:p.authenticated===true,inference_ok:p.inference_ok===true,http_status:p.http_status||null,model:p.model||null,expected:p.expected||null,correct:p.correct===true,content_digest:p.content_digest||null,error_class:p.error_class||null,free_only:true,paid_fallback:false,secrets_redacted:true},p.ok===true?200:503);
+}
+
 async function adminContext(env,ctx){
   const health=await readApp("/health",env,ctx);
   const source=await readApp("/source",env,ctx);
@@ -60,6 +66,7 @@ export default{
   async fetch(req,env,ctx){
     const url=new URL(req.url);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-runtime")return modelScopeRuntimeSelftest(env);
+    if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-inference")return modelScopeInferenceSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/admin/context"){
       if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"admin context is service-binding internal only"},403);
       return adminContext(env,ctx);
