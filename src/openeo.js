@@ -65,40 +65,6 @@ export async function describeOpenEOAccount(env){
   return {user_id:String(me?.user_id||""),budget:me?.budget??null,default_plan:me?.default_plan??null};
 }
 
-export async function runOpenEOAcceptanceSelftest(env){
-  const a=await accessToken(env);
-  if(!a.configured)throw Object.assign(new Error("OPENEO_NOT_CONFIGURED"),{status:503});
-  const me=await fetchJson(`${CORE_BASE}/me`,{headers:authHeaders(a.token)});
-  const c=new AbortController(),timer=setTimeout(()=>c.abort(),45000);
-  try{
-    const body=JSON.stringify({
-      process:{process_graph:{add1:{process_id:"add",arguments:{x:3,y:5},result:true}}},
-      budget:10
-    });
-    const r=await fetch(`${CORE_BASE}/result`,{method:"POST",signal:c.signal,headers:{accept:"application/json","content-type":"application/json",...authHeaders(a.token)},body});
-    const text=await r.text();let result=null;
-    try{result=text?JSON.parse(text):null}catch{result=text}
-    if(!r.ok)throw Object.assign(new Error(`OPENEO_SELFTEST_HTTP_${r.status}`),{status:r.status,details:result});
-    const costsRaw=r.headers.get("OpenEO-Costs")||r.headers.get("openeo-costs")||null;
-    const costs=costsRaw===null?null:Number(costsRaw);
-    return {
-      ok:result===8,
-      authenticated:true,
-      account_visible:Boolean(me?.user_id),
-      budget_before:me?.budget??null,
-      default_plan:me?.default_plan??null,
-      result_is_8:result===8,
-      costs:Number.isFinite(costs)?costs:costsRaw,
-      endpoint:"core-cdse",
-      api_version:"1.2.0",
-      secret_echo:false
-    };
-  }catch(e){
-    if(e?.name==="AbortError")throw Object.assign(new Error("OPENEO_SELFTEST_TIMEOUT"),{status:504});
-    throw e;
-  }finally{clearTimeout(timer)}
-}
-
 export const openEOMeta=()=>({
   core_endpoint:CORE_BASE,
   federation_endpoint:FED_BASE,
