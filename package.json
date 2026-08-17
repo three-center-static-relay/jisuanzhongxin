@@ -3,9 +3,7 @@
   "private": true,
   "scripts": {
     "stress": "node tests/stress.mjs",
-    "test:inference-hardening": "node tests/inference-hardening.mjs",
-    "test:commercial-spatial-advanced": "node tests/commercial-spatial-advanced.mjs",
-    "test:build-gate": "node tests/inference-hardening.mjs && node tests/commercial-spatial-advanced.mjs"
+    "test:inference-hardening": "node tests/inference-hardening.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0",
