@@ -1,0 +1,27 @@
+import assert from "node:assert/strict";
+const BASE="https://compute-worker.a15280020511.workers.dev";
+async function get(path){const c=new AbortController(),t=setTimeout(()=>c.abort(),30000);try{const r=await fetch(`${BASE}${path}`,{headers:{accept:"application/json"},signal:c.signal});const b=await r.json().catch(()=>null);return{status:r.status,body:b};}finally{clearTimeout(t)}}
+const health=await get("/v1/providers/baidu/health");
+assert.equal(health.status,200,`HEALTH_HTTP_${health.status}:${JSON.stringify(health.body)}`);
+assert.equal(health.body?.ok,true);
+assert.equal(health.body?.configured,true);
+assert.equal(health.body?.token_present,true);
+assert.equal(health.body?.authenticated,true);
+assert.equal(health.body?.authentication_tested,true);
+assert.equal(health.body?.manual_ready,true);
+assert.equal(health.body?.payment_mode,"coupon");
+assert.equal(health.body?.acoin_allowed,false);
+assert.equal(health.body?.paid_fallback,false);
+assert.equal(health.body?.secret_echo,false);
+const meta=await get("/v1/providers/baidu/bridge/meta");
+assert.equal(meta.status,200,`META_HTTP_${meta.status}:${JSON.stringify(meta.body)}`);
+assert.equal(meta.body?.ok,true);
+assert.equal(meta.body?.configured,true);
+assert.equal(meta.body?.provider,"circleci");
+assert.equal(meta.body?.e2e_verified,false);
+assert.equal(meta.body?.automation_ready,false);
+assert.equal(meta.body?.route_eligible,false);
+assert.equal(meta.body?.runtime_production,null);
+assert.equal(meta.body?.paid_fallback,false);
+assert.equal(meta.body?.free_only,true);
+console.log(JSON.stringify({ok:true,suite:"diag-baidu-production-readiness",health:{configured:true,authenticated:true,manual_ready:true},bridge:{configured:true,e2e_verified:false,automation_ready:false,route_eligible:false,runtime_production:null},gpu_consumed:false,secrets_redacted:true}));
