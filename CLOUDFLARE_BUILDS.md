@@ -8,8 +8,8 @@ Configure `compute-worker` under **Settings > Build** with the following reposit
 | Build watch include | `*` |
 | Production branch | `main` |
 | Build command | empty |
-| Production deploy command | `npm run cf:build && wrangler deploy` |
-| Non-production deploy command | `npm run cf:build && wrangler versions upload` |
+| Production deploy command | `npm run cf:build && npx wrangler deploy` |
+| Non-production deploy command | `npm run cf:build && npx wrangler versions upload` |
 | Non-production branches | include `*`, exclude `main` |
 
 Cloudflare Workers Builds currently ignores Wrangler custom-build configuration. The deploy commands therefore invoke the fail-closed repository gate explicitly. Wrangler comes from `package.json`; the build does not fetch a floating CLI version.
