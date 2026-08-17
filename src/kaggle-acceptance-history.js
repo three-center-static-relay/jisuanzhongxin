@@ -1,0 +1,28 @@
+export const KAGGLE_ACCEPTANCE_HISTORY=Object.freeze({
+  schema:"kaggle-acceptance-history-v1",
+  latest_recipe_attempt:Object.freeze({
+    task_id:"kaggle-recipe-live-20260817-robust-site-cpu",
+    model_id:"commercial.robust_site_scenario",
+    recipe:"commercial_spatial_signal_v2",
+    method:"robust_site_scenario",
+    intended_accelerator:"cpu",
+    intended_draws:500,
+    one_shot:true,
+    automatic_retry:false,
+    trigger_build_conclusion:"failure",
+    task_created:false,
+    task_absence_verified:true,
+    task_absence_http_status:404,
+    kernel_creation_confirmed:false,
+    result_digest:null,
+    result_verified:false,
+    fresh_e2e_verified:false,
+    root_cause:"UNRESOLVED_PRE_TASK_GATE",
+    current_auth_health_verified_after_attempt:true,
+    current_live_health_http_status_after_attempt:200,
+    current_business_e2e_asserted:false,
+    retry_performed:false,
+    production_promoted:false,
+    verified_at:"2026-08-17T04:38:16Z"
+  })
+});
