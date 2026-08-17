@@ -5,6 +5,7 @@ import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {medicalImagingMeta} from "./medical-imaging-toolkit.js";
 import {chooseModalAccelerator,modalCpuSelftest,modalGpuSelftest,modalHealth,modalMeta} from "./modal.js";
 import {modalBoundedCompute} from "./modal-generic-compute.js";
+import {normalizeModalHealth,normalizeModalMeta,patchProviderTruthResponse} from "./provider-truth.js";
 export {CenterGate};
 
 const NO_STORE={"cache-control":"no-store"};
@@ -44,8 +45,8 @@ export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url);
     if(req.method==="GET"&&u.pathname==="/v1/toolkits/medical-imaging/meta")return json({ok:true,...medicalImagingMeta(),request_profile:"medical-imaging",gpu_optional:true});
-    if(req.method==="GET"&&u.pathname==="/v1/providers/modal/meta")return json({ok:true,...modalMeta(),secret_echo:false});
-    if(req.method==="GET"&&u.pathname==="/v1/providers/modal/health"){const p=await publicModalHealth(env);return json(p,p.ok?200:503)}
+    if(req.method==="GET"&&u.pathname==="/v1/providers/modal/meta")return json({ok:true,...normalizeModalMeta(modalMeta()),secret_echo:false});
+    if(req.method==="GET"&&u.pathname==="/v1/providers/modal/health"){const p=normalizeModalHealth(await publicModalHealth(env));return json(p,p.ok?200:503)}
     if(req.method==="POST"&&u.pathname==="/v1/providers/modal/route/plan"){
       let body={};try{body=await req.json()}catch{}
       return json({ok:true,...chooseModalAccelerator(body),execution_started:false,secret_echo:false});
@@ -80,7 +81,8 @@ export default {
     if(modelHandled)return modelHandled;
     const handled=await maybeHandleBaiduCircleCI(req,env);
     if(handled)return handled;
-    const response=await production.fetch(req,env,ctx);
-    return patchGoogleReadiness(req,response,env);
+    let response=await production.fetch(req,env,ctx);
+    response=await patchGoogleReadiness(req,response,env);
+    return patchProviderTruthResponse(req,response);
   }
 };
