@@ -64,4 +64,4 @@ assert.match(entry,/patchProviderTruthResponse/);
 assert.match(entry,/normalizeModalMeta\(modalMeta\(\)\)/);
 assert.match(entry,/normalizeModalHealth\(await publicModalHealth\(env\)\)/);
 
-console.log(JSON.stringify({ok:true,suite:"provider-truth-semantics",historical_e2e_separate:true,live_health_separate:true,static_summary_fail_closed:true,current_e2e_not_asserted_without_selftest:true}));
+console.log(JSON.stringify({ok:true,suite:"provider-truth-semantics",truth_model:"provider-truth-v1",historical_e2e_separate:true,live_health_separate:true,static_summary_fail_closed:true,current_e2e_not_asserted_without_selftest:true}));
