@@ -47,7 +47,28 @@ async function modelScopeRuntimeSelftest(env){
 
 async function modelScopeInferenceSelftest(env){
   const p=await modelScopeInferenceCanary(env);
-  return json({ok:p.ok===true,selftest:"modelscope-inference",secret_present:p.configured===true,authenticated:p.authenticated===true,inference_ok:p.inference_ok===true,http_status:p.http_status||null,model:p.model||null,expected:p.expected||null,correct:p.correct===true,content_digest:p.content_digest||null,error_class:p.error_class||null,free_only:true,paid_fallback:false,secrets_redacted:true},p.ok===true?200:503);
+  return json({
+    ok:p.ok===true,
+    selftest:"modelscope-inference",
+    secret_present:p.configured===true,
+    authenticated:p.authenticated===true,
+    inference_ok:p.inference_ok===true,
+    http_status:p.http_status||null,
+    model:p.model||null,
+    canary_revision:p.canary_revision||null,
+    response_mode:p.response_mode||null,
+    stream_events:Number(p.stream_events||0),
+    content_chars:Number(p.content_chars||0),
+    reasoning_chars:Number(p.reasoning_chars||0),
+    response_digest:p.response_digest||null,
+    output_digest:p.output_digest||p.content_digest||null,
+    expected:p.expected||null,
+    correct:p.correct===true,
+    error_class:p.error_class||null,
+    free_only:true,
+    paid_fallback:false,
+    secrets_redacted:true
+  },p.ok===true?200:503);
 }
 
 async function adminContext(env,ctx){
