@@ -2,6 +2,7 @@ import production,{CenterGate} from "./production.js";
 import {maybeHandleBaiduCircleCI} from "./baidu-circleci-router.js";
 import {maybeHandleModels} from "./model-router.js";
 import {maybeHandleBenchmarks} from "./benchmark-router.js";
+import {maybeHandleOpenEOHandoff} from "./openeo-handoff-router.js";
 import {medicalImagingMeta} from "./medical-imaging-toolkit.js";
 import {chooseModalAccelerator,modalCpuSelftest,modalGpuSelftest,modalHealth,modalMeta} from "./modal.js";
 import {modalBoundedCompute} from "./modal-generic-compute.js";
@@ -74,6 +75,8 @@ export default {
       const p=await modalGpuSelftest(env,n);
       return json(p,p.ok?200:503);
     }
+    const openEOHandled=await maybeHandleOpenEOHandoff(req,env);
+    if(openEOHandled)return openEOHandled;
     req=await normalizeMedicalImagingRequest(req);
     const benchmarkHandled=await maybeHandleBenchmarks(req);
     if(benchmarkHandled)return benchmarkHandled;
