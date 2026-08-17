@@ -10,7 +10,6 @@ export {CenterGate,ModelScopeStudioLiteWorkflow};
 
 const ORIGIN="https://compute.internal";
 const SERVICE="compute-worker";
-const STUDIO_ACCEPTANCE_CRON="*/5 * * * *";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
 async function readApp(path,env,ctx){
@@ -67,20 +66,6 @@ async function getStudioLiteWorkflow(env,url){
     return json({ok:true,runner:"modelscope-studio-lite-workflow",instance_id:instance.id,status:await instance.status(),free_only:true,paid_fallback:false,secrets_redacted:true});
   }catch(e){return json({ok:false,error:"WORKFLOW_INSTANCE_LOOKUP_FAILED",message:String(e?.message||e)},404)}
 }
-async function triggerStudioLiteAcceptanceWorkflow(env,controller){
-  if(!env.MODELSCOPE_STUDIO_WORKFLOW?.create||!env.MODELSCOPE_STUDIO_WORKFLOW?.get)throw new Error("MODELSCOPE_STUDIO_WORKFLOW_UNAVAILABLE");
-  const scheduledTime=Number(controller?.scheduledTime||Date.now());
-  const id=`ms-lite-accept-${scheduledTime}`;
-  try{
-    const instance=await env.MODELSCOPE_STUDIO_WORKFLOW.create({id,params:{requested_at:new Date(scheduledTime).toISOString(),trigger:"acceptance-cron",free_only:true},retention:{successRetention:"1 day",errorRetention:"1 day"}});
-    return await instance.status();
-  }catch(createError){
-    try{
-      const existing=await env.MODELSCOPE_STUDIO_WORKFLOW.get(id);
-      return await existing.status();
-    }catch{throw createError}
-  }
-}
 
 export default{
   async fetch(req,env,ctx){
@@ -121,8 +106,5 @@ export default{
     }
     return app.fetch(req,env,ctx);
   },
-  async scheduled(controller,env,ctx){
-    if(controller.cron===STUDIO_ACCEPTANCE_CRON){await triggerStudioLiteAcceptanceWorkflow(env,controller);return}
-    ctx.waitUntil(Promise.all([runAutonomySweep(app,env,ctx),runModelScopeRuntimeSweep(env)]));
-  }
+  async scheduled(controller,env,ctx){ctx.waitUntil(Promise.all([runAutonomySweep(app,env,ctx),runModelScopeRuntimeSweep(env)]))}
 };
