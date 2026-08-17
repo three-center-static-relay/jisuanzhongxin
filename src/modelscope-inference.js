@@ -1,5 +1,5 @@
 const API="https://api-inference.modelscope.cn/v1/chat/completions";
-const MODEL="Qwen/Qwen3-32B";
+const MODEL="Qwen/Qwen2.5-Coder-32B-Instruct";
 const TIMEOUT_MS=30000;
 const str=v=>String(v??"").trim();
 function token(env={}){return str(env.MODELSCOPE_API_TOKEN)||str(env.MODELSCOPE_TOKEN)}
@@ -9,7 +9,7 @@ export async function modelScopeInferenceCanary(env={}){
   if(!t)return{ok:false,provider:"modelscope",configured:false,authenticated:false,inference_ok:false,error_class:"MODELSCOPE_TOKEN_REQUIRED",free_only:true,paid_fallback:false,secrets_redacted:true};
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),TIMEOUT_MS);
   try{
-    const r=await fetch(API,{method:"POST",headers:{authorization:`Bearer ${t}`,"content-type":"application/json",accept:"application/json"},body:JSON.stringify({model:MODEL,messages:[{role:"user",content:"Calculate 17*19. Return only the integer."}],temperature:0,max_tokens:32,enable_thinking:false,stream:false}),signal:controller.signal});
+    const r=await fetch(API,{method:"POST",headers:{authorization:`Bearer ${t}`,"content-type":"application/json",accept:"application/json"},body:JSON.stringify({model:MODEL,messages:[{role:"user",content:"Calculate 17*19. Return only the integer."}],temperature:0,max_tokens:64,stream:false}),signal:controller.signal});
     const text=await r.text();let data=null;try{data=text?JSON.parse(text):null}catch{}
     const content=str(data?.choices?.[0]?.message?.content);
     const correct=/\b323\b/.test(content);
