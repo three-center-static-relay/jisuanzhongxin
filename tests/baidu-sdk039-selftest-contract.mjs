@@ -6,7 +6,8 @@ const admin=fs.readFileSync(new URL("../src/admin-entry.js",import.meta.url),"ut
 const config=fs.readFileSync(new URL("../.circleci/config.yml",import.meta.url),"utf8");
 const probe=fs.readFileSync(new URL("../bridge/baidu/sdk_selftest.py",import.meta.url),"utf8");
 const wrangler=fs.readFileSync(new URL("../wrangler.jsonc",import.meta.url),"utf8");
-const wrapperUrl=new URL("../src/production-entry-baidu-sdk039-selftest.js",import.meta.url);
+const oldWrapperUrl=new URL("../src/production-entry-baidu-sdk039-selftest.js",import.meta.url);
+const p24cWrapperUrl=new URL("../src/production-entry-baidu-p24c-sdk039-e2e.js",import.meta.url);
 const meta=baiduCircleCIMeta({CIRCLECI_API_TOKEN:"x",CIRCLECI_PROJECT_SLUG:"circleci/org/project",CIRCLECI_PIPELINE_DEFINITION_ID:"def"});
 
 assert.equal(meta.runtime_production,null);
@@ -25,6 +26,7 @@ assert.equal(meta.sdk_candidate_control_plane_evidence.production_promoted,false
 assert.equal(meta.sdk_candidate_control_plane_evidence.verified_at,"2026-08-16T23:53:42Z");
 assert.equal(meta.sdk_candidate_gpu_submission,false);
 assert.equal(meta.sdk_candidate_gpu_verified,false);
+assert.equal(meta.sdk_candidate_acceptance_task,"baidu-circleci-live-20260817p24c-sdk039");
 assert.equal(meta.candidate_retest_policy,"single-sdk039-p24-canary-allowed-after-control-plane-pass");
 assert.ok(meta.allowed_operations.includes("SDK_SELFTEST"));
 
@@ -56,12 +58,13 @@ assert.match(probe,/"compute_credit_used": False/);
 assert.match(probe,/"secrets_emitted": False/);
 assert.doesNotMatch(probe,/aistudio\s+submit\s+job/i);
 
-assert.match(admin,/from "\.\/production-entry\.js"/);
+assert.match(admin,/production-entry-baidu-p24c-sdk039-e2e\.js/);
 assert.doesNotMatch(admin,/production-entry-baidu-sdk039-selftest\.js/);
-assert.equal(fs.existsSync(wrapperUrl),false);
+assert.equal(fs.existsSync(oldWrapperUrl),false);
+assert.equal(fs.existsSync(p24cWrapperUrl),true);
 assert.doesNotMatch(admin,/"\* \* \* \* \*"/);
 assert.match(admin,/runAutonomySweep\(app,env,ctx\)/);
 assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
 assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
 
-console.log(JSON.stringify({ok:true,suite:"baidu-sdk039-selftest-contract",sdk_candidate:"0.3.9",control_plane_verified:true,task_id:"baidu-sdk039-control-plane-20260816c",bounded_query_seconds:25,terminal_callback:true,gpu_submitted:false,compute_credit_used:false,secrets_emitted:false,production_runtime:null,route_eligible:false,temporary_public_wrapper_removed:true,one_controlled_p24_sdk039_canary_allowed:true,minute_cron:false}));
+console.log(JSON.stringify({ok:true,suite:"baidu-sdk039-selftest-contract",sdk_candidate:"0.3.9",control_plane_verified:true,task_id:"baidu-sdk039-control-plane-20260816c",bounded_query_seconds:25,terminal_callback:true,production_runtime:null,route_eligible:false,old_sdk_public_wrapper_removed:true,temporary_p24c_wrapper:true,one_controlled_p24_sdk039_canary_allowed:true,minute_cron:false}));
