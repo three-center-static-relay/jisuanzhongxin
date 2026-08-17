@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+// Diagnostic-only one-shot trigger; fixed production task id prevents duplicate Baidu jobs.
 const url="https://compute-worker.a15280020511.workers.dev/__acceptance/baidu-v100-p24c-sdk039-20260817-0384d41bd74495a633af72ee3a0ba1b03b064a83776dea891af8d741368151fa";
 const controller=new AbortController();
 const timer=setTimeout(()=>controller.abort(),30000);
