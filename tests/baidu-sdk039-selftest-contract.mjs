@@ -49,7 +49,7 @@ assert.match(probe,/"compute_credit_used": False/);
 assert.match(probe,/"secrets_emitted": False/);
 assert.doesNotMatch(probe,/submit\s+job/i);
 
-assert.match(admin,/from "\.\/production-entry\.js"/);
+assert.match(admin,/from "\.\/production-entry(?:-kaggle-robust-site-e2e)?\.js"/);
 assert.doesNotMatch(admin,/production-entry-baidu-sdk039-selftest\.js/);
 assert.doesNotMatch(admin,/production-entry-baidu-p24c-sdk039-e2e\.js/);
 assert.equal(fs.existsSync(oldWrapperUrl),false);
@@ -59,4 +59,4 @@ assert.match(admin,/runAutonomySweep\(app,env,ctx\)/);
 assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
 assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
 
-console.log(JSON.stringify({ok:true,suite:"baidu-sdk039-selftest-contract",sdk_candidate:"0.3.9",control_plane_verified:true,gpu_acceptance_failed:true,gpu_failure_class:"BAIDU_COMPUTE_CREDIT_INSUFFICIENT",baidu_job_id_confirmed:false,v100_cuda_verified:false,production_runtime:null,route_eligible:false,temporary_public_wrappers_removed:true,retest_blocked_until_free_coupon_credit:true}));
+console.log(JSON.stringify({ok:true,suite:"baidu-sdk039-selftest-contract",sdk_candidate:"0.3.9",control_plane_verified:true,gpu_acceptance_failed:true,gpu_failure_class:"BAIDU_COMPUTE_CREDIT_INSUFFICIENT",baidu_job_id_confirmed:false,v100_cuda_verified:false,production_runtime:null,route_eligible:false,temporary_public_wrappers_removed:true,retest_blocked_until_free_coupon_credit:true,temporary_kaggle_acceptance_wrapper_allowed:true}));
