@@ -56,8 +56,9 @@ for(const forbidden of [
   "studio-lite-once-v2-20260817"
 ]) assert.ok(!entry.includes(forbidden),`Public Studio Lite write surface must be absent: ${forbidden}`);
 
-assert.ok(!wrangler.includes("*/5 * * * *"),"Studio Lite must not install a recurring 5-minute bootstrap cron");
+assert.equal((wrangler.match(/\*\/5 \* \* \* \*/g)||[]).length,1,"Acceptance build may contain exactly one temporary 5-minute Workflow schedule");
+assert.ok(wrangler.includes('"schedules":["*/5 * * * *"]'),"Temporary acceptance must use the Workflow schedule, not a Worker Cron");
 assert.ok(!entry.includes('req.method===\"POST\"&&url.pathname===\"/v1/selftest/modelscope-studio-lite\"'),"Public Studio Lite status endpoint must remain read-only");
 assert.ok(entry.indexOf('url.pathname===\"/v1/admin/modelscope/studio-lite/stop\"')>=0,"Internal emergency stop route must exist");
 
-console.log(JSON.stringify({ok:true,suite:"modelscope-studio-lite-cpu-runner-contract",module_imported:true,target_hardware:"platform/2v-cpu-16g-mem",nominal_cpu:2,nominal_memory_gb:16,min_effective_cpu:1.9,min_effective_memory_gib:14,free_only:true,paid_fallback:false,private_studio:true,phased_runner:true,idempotent_upload:true,stop_independent_of_hardware_catalog:true,public_write_surface:false,internal_workflow_control:true,recurring_bootstrap:false}));
+console.log(JSON.stringify({ok:true,suite:"modelscope-studio-lite-cpu-runner-contract",module_imported:true,target_hardware:"platform/2v-cpu-16g-mem",nominal_cpu:2,nominal_memory_gb:16,min_effective_cpu:1.9,min_effective_memory_gib:14,free_only:true,paid_fallback:false,private_studio:true,phased_runner:true,idempotent_upload:true,stop_independent_of_hardware_catalog:true,public_write_surface:false,internal_workflow_control:true,temporary_acceptance_workflow_schedule:true}));
