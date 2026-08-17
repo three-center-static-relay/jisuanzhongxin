@@ -5,11 +5,11 @@ import {probeModelScope} from "./modelscope-compute.js";
 import {modelScopeInferenceCanary} from "./modelscope-inference.js";
 import {getModelScopeStudioStatus} from "./modelscope-studio.js";
 import {getModelScopeStudioLiteStatus,runModelScopeStudioLiteBootstrap,prepareModelScopeStudioLite,deployModelScopeStudioLite,stopModelScopeStudioLite} from "./modelscope-studio-lite.js";
-export {CenterGate};
+import {ModelScopeStudioLiteWorkflow} from "./modelscope-studio-workflow.js";
+export {CenterGate,ModelScopeStudioLiteWorkflow};
 
 const ORIGIN="https://compute.internal";
 const SERVICE="compute-worker";
-const STUDIO_LITE_ONCE_HEADER="studio-lite-once-v2-20260817";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
 async function readApp(path,env,ctx){
@@ -39,13 +39,6 @@ async function modelScopeInferenceSelftest(env){
 
 async function modelScopeStudioSelftest(env){const p=await getModelScopeStudioStatus(env);return json(p,p.runtime_e2e_verified===true?200:503)}
 async function modelScopeStudioLiteSelftest(env){const p=await getModelScopeStudioLiteStatus(env);return json(p,p.runtime_e2e_verified===true?200:503)}
-function studioLiteGate(req){return req.headers.get("x-three-center-selftest")===STUDIO_LITE_ONCE_HEADER}
-async function studioLitePhase(req,env,phase){
-  if(!studioLiteGate(req))return json({ok:false,error:"POLICY_DENIED",selftest:`modelscope-studio-lite-${phase}-once`,free_only:true,paid_fallback:false,secrets_redacted:true},403);
-  const fn=phase==="prepare"?prepareModelScopeStudioLite:phase==="deploy"?deployModelScopeStudioLite:phase==="stop"?stopModelScopeStudioLite:runModelScopeStudioLiteBootstrap;
-  const p=await fn(env);
-  return json({...p,selftest:`modelscope-studio-lite-${phase}-once`,free_only:true,paid_fallback:false,secrets_redacted:true},p.ok===true?200:503);
-}
 
 async function adminContext(env,ctx){
   const health=await readApp("/health",env,ctx),source=await readApp("/source",env,ctx),acceptance=await readApp("/v1/acceptance/latest",env,ctx),gate=await readGate(env),autonomy=await getAutonomySnapshot(env),modelscopeRuntime=await getModelScopeRuntimeSnapshot(env),version=env.CF_VERSION_METADATA||{};
@@ -58,6 +51,21 @@ async function internalStudioLite(env,phase){
   const fn=phase==="status"?getModelScopeStudioLiteStatus:phase==="prepare"?prepareModelScopeStudioLite:phase==="deploy"?deployModelScopeStudioLite:phase==="stop"?stopModelScopeStudioLite:runModelScopeStudioLiteBootstrap;
   const p=await fn(env);return json(p,p.ok===true?200:503);
 }
+async function startStudioLiteWorkflow(env){
+  if(!env.MODELSCOPE_STUDIO_WORKFLOW?.create)return json({ok:false,error:"MODELSCOPE_STUDIO_WORKFLOW_UNAVAILABLE"},503);
+  const id=`ms-lite-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
+  const instance=await env.MODELSCOPE_STUDIO_WORKFLOW.create({id,params:{requested_at:new Date().toISOString(),free_only:true},retention:{successRetention:"1 day",errorRetention:"1 day"}});
+  return json({ok:true,runner:"modelscope-studio-lite-workflow",instance_id:instance.id,status:await instance.status(),free_only:true,paid_fallback:false,secrets_redacted:true});
+}
+async function getStudioLiteWorkflow(env,url){
+  if(!env.MODELSCOPE_STUDIO_WORKFLOW?.get)return json({ok:false,error:"MODELSCOPE_STUDIO_WORKFLOW_UNAVAILABLE"},503);
+  const id=String(url.searchParams.get("id")||"");
+  if(!/^[A-Za-z0-9_][A-Za-z0-9_-]{0,99}$/.test(id))return json({ok:false,error:"INVALID_WORKFLOW_INSTANCE_ID"},400);
+  try{
+    const instance=await env.MODELSCOPE_STUDIO_WORKFLOW.get(id);
+    return json({ok:true,runner:"modelscope-studio-lite-workflow",instance_id:instance.id,status:await instance.status(),free_only:true,paid_fallback:false,secrets_redacted:true});
+  }catch(e){return json({ok:false,error:"WORKFLOW_INSTANCE_LOOKUP_FAILED",message:String(e?.message||e)},404)}
+}
 
 export default{
   async fetch(req,env,ctx){
@@ -66,10 +74,6 @@ export default{
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-inference")return modelScopeInferenceSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio")return modelScopeStudioSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio-lite")return modelScopeStudioLiteSelftest(env);
-    if(req.method==="POST"&&url.pathname==="/v1/selftest/modelscope-studio-lite-prepare-once")return studioLitePhase(req,env,"prepare");
-    if(req.method==="POST"&&url.pathname==="/v1/selftest/modelscope-studio-lite-deploy-once")return studioLitePhase(req,env,"deploy");
-    if(req.method==="POST"&&url.pathname==="/v1/selftest/modelscope-studio-lite-stop-once")return studioLitePhase(req,env,"stop");
-    if(req.method==="POST"&&url.pathname==="/v1/selftest/modelscope-studio-lite-bootstrap-once")return studioLitePhase(req,env,"bootstrap");
     if(req.method==="GET"&&url.pathname==="/v1/admin/context"){
       const denied=internalOnly(url,"admin context is service-binding internal only");if(denied)return denied;return adminContext(env,ctx);
     }
@@ -93,6 +97,12 @@ export default{
     }
     if(req.method==="POST"&&url.pathname==="/v1/admin/modelscope/studio-lite-bootstrap"){
       const denied=internalOnly(url,"ModelScope Studio Lite bootstrap is service-binding internal only");if(denied)return denied;return internalStudioLite(env,"bootstrap");
+    }
+    if(req.method==="POST"&&url.pathname==="/v1/admin/modelscope/studio-lite/run"){
+      const denied=internalOnly(url,"ModelScope Studio Lite Workflow start is service-binding internal only");if(denied)return denied;return startStudioLiteWorkflow(env);
+    }
+    if(req.method==="GET"&&url.pathname==="/v1/admin/modelscope/studio-lite/workflow"){
+      const denied=internalOnly(url,"ModelScope Studio Lite Workflow status is service-binding internal only");if(denied)return denied;return getStudioLiteWorkflow(env,url);
     }
     return app.fetch(req,env,ctx);
   },
