@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
-const wrangler=readFileSync(new URL("../wrangler.jsonc",import.meta.url),"utf8");
-const build=wrangler.match(/"build"\s*:\s*\{\s*"command"\s*:\s*"([^"]+)"/)?.[1]||"";
-assert.ok(build,"build command must exist");
+const pkg=JSON.parse(readFileSync(new URL("../package.json",import.meta.url),"utf8"));
+const build=pkg.scripts?.["test:build-gate"]||"";
+assert.ok(build,"package build gate must exist");
 for(const required of [
   "tests/modelscope-provider.mjs",
   "tests/modelscope-runtime-alert-contract.mjs",

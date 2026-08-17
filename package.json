@@ -7,7 +7,11 @@
     "test:inference-hardening": "node tests/inference-hardening.mjs",
     "test:commercial-spatial-advanced": "node tests/commercial-spatial-advanced.mjs",
     "test:commercial-spatial-signal": "node tests/commercial-spatial-signal.mjs",
-    "test:capability-manifest": "node tests/capability-manifest-contract.mjs"
+    "test:capability-manifest": "node tests/capability-manifest-contract.mjs",
+    "test:build-gate": "node tests/cloudflare-build-gate-contract.mjs && node tests/capability-manifest-contract.mjs && node tests/openeo-intelligence-handoff.mjs && node tests/predeploy.mjs && node tests/predeploy-circleci.mjs && node tests/google-cloud-credential-unification.mjs && node tests/model-library.mjs && node tests/universal-model-library.mjs && node tests/industry-specialist-recipes.mjs && node tests/commercial-spatial-fusion.mjs && node tests/geospatial-commercial-domain.mjs && node tests/commercial-spatial-model-dispatch.mjs && node tests/kaggle-package-audit.mjs && node tests/medical-imaging-toolkit.mjs && node tests/benchmark-library.mjs && node tests/admin-context-contract.mjs && node tests/modal-provider.mjs && node tests/provider-autonomy-contract.mjs && node tests/provider-route-truth.mjs && node tests/provider-truth-semantics.mjs && node tests/modal-execution-guard.mjs && node tests/baidu-control-guard.mjs && node tests/benchmark-route-guard.mjs && node tests/modal-public-health-cache.mjs && node tests/baidu-terminal-detail-contract.mjs && node tests/baidu-bootstrap-sentinel-contract.mjs && node tests/baidu-p24b-final-acceptance-contract.mjs && node tests/baidu-sdk039-selftest-contract.mjs && node tests/baidu-p24c-sdk039-acceptance-contract.mjs && node tests/commercial-spatial-signal.mjs && node tests/kaggle-model-result-envelope.mjs && node tests/kaggle-robust-site-e2e-contract.mjs && node tests/modelscope-provider.mjs && node tests/modelscope-runtime-alert-contract.mjs && node tests/modelscope-live-selftest-contract.mjs && node tests/modelscope-inference-contract.mjs && node tests/modelscope-studio-cpu-runner-contract.mjs && node tests/modelscope-studio-lite-cpu-runner-contract.mjs && node tests/modelscope-studio-workflow-contract.mjs && node tests/modelscope-deploy-isolation-contract.mjs",
+    "cf:build": "npm run test:build-gate",
+    "cf:preview": "npm run cf:build && wrangler versions upload",
+    "cf:deploy": "npm run cf:build && wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.0.0",

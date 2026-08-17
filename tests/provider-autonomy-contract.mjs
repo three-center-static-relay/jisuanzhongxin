@@ -10,6 +10,7 @@ const runtime=read("../bridge/baidu/job/run.py");
 const oldSdkWrapperUrl=new URL("../src/production-entry-baidu-sdk039-selftest.js",import.meta.url);
 const p24cWrapperUrl=new URL("../src/production-entry-baidu-p24c-sdk039-e2e.js",import.meta.url);
 const wrangler=read("../wrangler.jsonc");
+const buildGate=JSON.parse(read("../package.json")).scripts?.["test:build-gate"]||"";
 
 assert.equal(AUTONOMY_POLICY.free_only,true);
 assert.equal(AUTONOMY_POLICY.paid_fallback,false);
@@ -52,7 +53,7 @@ assert.equal(fs.existsSync(p24cWrapperUrl),false);
 assert.doesNotMatch(admin,/"\* \* \* \* \*"/);
 assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
 assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
-assert.match(wrangler,/baidu-p24c-sdk039-acceptance-contract\.mjs/);
+assert.match(buildGate,/baidu-p24c-sdk039-acceptance-contract\.mjs/);
 
 assert.match(baidu,/baidu_payment:"coupon"/);
 assert.match(baidu,/paid_fallback:false/);
