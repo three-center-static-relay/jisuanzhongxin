@@ -16,10 +16,10 @@ assert.equal(missing.static_shared_secret_required,false);
 assert.equal(missing.ephemeral_ticket,true);
 assert.equal(missing.sdk_pinned,"aistudio-sdk==0.3.8");
 assert.equal(missing.sdk_upgrade_candidate,"aistudio-sdk==0.3.9");
-assert.equal(missing.sdk_candidate_control_plane_verified,true);
 assert.equal(missing.sdk_candidate_gpu_submission,false);
 assert.equal(missing.sdk_candidate_gpu_verified,false);
-assert.equal(missing.sdk_candidate_acceptance_task,"baidu-circleci-live-20260817p24c-sdk039");
+assert.equal(missing.sdk_candidate_gpu_attempt_evidence.failure_class,"BAIDU_COMPUTE_CREDIT_INSUFFICIENT");
+assert.equal(missing.sdk_candidate_gpu_attempt_evidence.baidu_job_id_confirmed,false);
 
 const acceptanceOnly=baiduCircleCIMeta({CIRCLECI_API_TOKEN:"x",CIRCLECI_PROJECT_SLUG:"circleci/org/project",CIRCLECI_PIPELINE_DEFINITION_ID:"def",BAIDU_CIRCLECI_E2E_VERIFIED:"true"});
 assert.equal(acceptanceOnly.configured,true);
@@ -40,6 +40,7 @@ const bridge=fs.readFileSync(new URL("../bridge/baidu/bridge.py",import.meta.url
 const sdkSelftest=fs.readFileSync(new URL("../bridge/baidu/sdk_selftest.py",import.meta.url),"utf8");
 const job=fs.readFileSync(new URL("../bridge/baidu/job/run.py",import.meta.url),"utf8");
 const router=fs.readFileSync(new URL("../src/baidu-circleci-router.js",import.meta.url),"utf8");
+const baiduSource=fs.readFileSync(new URL("../src/baidu-circleci.js",import.meta.url),"utf8");
 assert.match(config,/bridge_dispatch:/);
 assert.match(config,/default: false/);
 assert.match(config,/bridge_ticket:/);
@@ -73,6 +74,8 @@ assert.match(router,/failure_class/);
 assert.match(router,/bridge_stage/);
 assert.match(job,/\/home\/aistudio\/output\/three-center-result\.json/);
 assert.match(job,/paddle\.set_device\("gpu:0"\)/);
+assert.doesNotMatch(baiduSource,/candidate_sdk_acceptance/);
+assert.doesNotMatch(baiduSource,/SDK039_ACCEPTANCE_TASK/);
 
 const oldFetch=globalThis.fetch;
 try{
@@ -82,7 +85,6 @@ try{
   const submit=await triggerBaiduBridge(env,{op:"SUBMIT",task_id:"task-001",bridge_ticket:ticket});
   assert.equal(submit.ok,true);
   assert.equal(submit.sdk_version,"0.3.8");
-  assert.equal(submit.candidate_sdk_acceptance,false);
   assert.match(calls[0].url,/circleci\.com\/api\/v2\/project\/circleci\/org\/project\/pipeline\/run$/);
   assert.equal(calls[0].headers["Circle-Token"],"circle-token");
   assert.equal(calls[0].body.definition_id,"definition-1");
@@ -95,19 +97,9 @@ try{
   const selftest=await triggerBaiduBridge(env,{op:"SDK_SELFTEST",task_id:"sdk-test-001",bridge_ticket:ticket});
   assert.equal(selftest.ok,true);
   assert.equal(selftest.sdk_version,"0.3.9");
-  assert.equal(selftest.candidate_sdk_acceptance,false);
   assert.equal(calls[1].body.parameters.bridge_op,"SDK_SELFTEST");
   assert.equal(calls[1].body.parameters.sdk_version,"0.3.9");
-
-  await assert.rejects(()=>triggerBaiduBridge(env,{op:"SUBMIT",task_id:"wrong-task",bridge_ticket:ticket,candidate_sdk_acceptance:true}),/BAIDU_SDK_CANDIDATE_ACCEPTANCE_DENIED/);
-  const candidate=await triggerBaiduBridge(env,{op:"SUBMIT",task_id:"baidu-circleci-live-20260817p24c-sdk039",bridge_ticket:ticket,candidate_sdk_acceptance:true});
-  assert.equal(candidate.ok,true);
-  assert.equal(candidate.sdk_version,"0.3.9");
-  assert.equal(candidate.candidate_sdk_acceptance,true);
-  assert.equal(calls[2].body.parameters.bridge_op,"SUBMIT");
-  assert.equal(calls[2].body.parameters.task_id,"baidu-circleci-live-20260817p24c-sdk039");
-  assert.equal(calls[2].body.parameters.sdk_version,"0.3.9");
   assert.equal(JSON.stringify(calls).includes("BAIDU_BRIDGE_SHARED_SECRET"),false);
 }finally{globalThis.fetch=oldFetch}
 
-console.log(JSON.stringify({ok:true,suite:"predeploy-circleci",fail_closed:true,coupon_only:true,fixed_v100:true,ephemeral_ticket:true,static_shared_secret:false,observable_stages:true,robust_job_id_parser:true,arbitrary_code:false,network:false,production_runtime_gate:true,normal_submit_sdk:"0.3.8",sdk039_isolated_selftest:true,sdk039_candidate_acceptance_task:"baidu-circleci-live-20260817p24c-sdk039",sdk039_candidate_acceptance_hard_bound:true}));
+console.log(JSON.stringify({ok:true,suite:"predeploy-circleci",fail_closed:true,coupon_only:true,fixed_v100:true,ephemeral_ticket:true,static_shared_secret:false,observable_stages:true,robust_job_id_parser:true,arbitrary_code:false,network:false,production_runtime_gate:true,normal_submit_sdk:"0.3.8",sdk039_isolated_selftest:true,p24c_candidate_submit_removed:true,p24c_latest_failure:"BAIDU_COMPUTE_CREDIT_INSUFFICIENT"}));
