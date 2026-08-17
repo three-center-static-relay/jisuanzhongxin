@@ -50,24 +50,28 @@ async function ensureApp(t,owner){
   const create=await commitAppAction(t,owner,"create");
   return create.ok?{ok:true,action:"create",http_status:create.status}:{ok:false,action:"create",http_status:create.status,error_class:`MODELSCOPE_STUDIO_COMMIT_HTTP_${create.status}`};
 }
-
-async function readiness(env={}){
+async function identity(env={}){
   const t=token(env);if(!t)return{ok:false,configured:false,error_class:"MODELSCOPE_TOKEN_REQUIRED"};
-  const [me,hw]=await Promise.all([req(`${OPENAPI}/users/me`,{headers:headers(t,false)}),req(`${OPENAPI}/studios/hardware?sdk_type=${encodeURIComponent(SDK_TYPE)}`,{headers:headers(t,false)})]);
-  const owner=me.ok?username(payload(me)):null,target=hw.ok?targetHardware(hw.data):null;
-  const ok=me.ok&&hw.ok&&Boolean(owner)&&Boolean(target);
-  return{ok,configured:true,authenticated:me.status!==401&&me.status!==403,owner,target,stock_available:target?.has_stock===true,identity_status:me.status,hardware_status:hw.status,error_class:ok?null:!me.ok?`MODELSCOPE_IDENTITY_HTTP_${me.status}`:!owner?"MODELSCOPE_OWNER_UNRESOLVED":!hw.ok?`MODELSCOPE_HARDWARE_HTTP_${hw.status}`:"TARGET_FREE_HARDWARE_UNAVAILABLE"};
+  const me=await req(`${OPENAPI}/users/me`,{headers:headers(t,false)}),owner=me.ok?username(payload(me)):null;
+  const ok=me.ok&&Boolean(owner);
+  return{ok,configured:true,authenticated:me.status!==401&&me.status!==403,token:t,owner,identity_status:me.status,error_class:ok?null:!me.ok?`MODELSCOPE_IDENTITY_HTTP_${me.status}`:"MODELSCOPE_OWNER_UNRESOLVED"};
+}
+async function readiness(env={}){
+  const id=await identity(env);if(!id.ok)return id;
+  const hw=await req(`${OPENAPI}/studios/hardware?sdk_type=${encodeURIComponent(SDK_TYPE)}`,{headers:headers(id.token,false)}),target=hw.ok?targetHardware(hw.data):null;
+  const ok=hw.ok&&Boolean(target);
+  return{...id,ok,target,stock_available:target?.has_stock===true,hardware_status:hw.status,error_class:ok?null:!hw.ok?`MODELSCOPE_HARDWARE_HTTP_${hw.status}`:"TARGET_FREE_HARDWARE_UNAVAILABLE"};
 }
 
 export async function getModelScopeStudioLiteStatus(env={}){
-  const r=await readiness(env),t=token(env);
-  if(!r.ok)return{ok:false,selftest:"modelscope-studio-lite",configured:r.configured===true,authenticated:r.authenticated===true,target_hardware:TARGET_HARDWARE,hardware:r.target||null,runtime_e2e_verified:false,route_eligible:false,error_class:r.error_class,free_only:true,paid_fallback:false,secrets_redacted:true};
-  const d=await detail(t,r.owner),l=d.ok?await logs(t,r.owner):null,receipt=l?.ok?parseReceipt(payload(l)):null,pass=receiptPass(receipt);
-  return{ok:pass,selftest:"modelscope-studio-lite",configured:true,authenticated:true,target_hardware:TARGET_HARDWARE,hardware:r.target,stock_available:r.stock_available===true,studio_found:d.ok,studio_detail_http_status:d.status,log_http_status:l?.status||null,runtime_receipt:cleanReceipt(receipt),runtime_e2e_verified:pass,route_eligible:pass,error_class:pass?null:!d.ok?`MODELSCOPE_STUDIO_DETAIL_HTTP_${d.status}`:!l?.ok?`MODELSCOPE_STUDIO_LOG_HTTP_${l?.status||0}`:"MODELSCOPE_STUDIO_LITE_NOT_VERIFIED",free_only:true,paid_fallback:false,secrets_redacted:true};
+  const id=await identity(env);if(!id.ok)return{ok:false,selftest:"modelscope-studio-lite",configured:id.configured===true,authenticated:id.authenticated===true,target_hardware:TARGET_HARDWARE,hardware:null,runtime_e2e_verified:false,route_eligible:false,error_class:id.error_class,free_only:true,paid_fallback:false,secrets_redacted:true};
+  const hw=await req(`${OPENAPI}/studios/hardware?sdk_type=${encodeURIComponent(SDK_TYPE)}`,{headers:headers(id.token,false)}),target=hw.ok?targetHardware(hw.data):null;
+  const d=await detail(id.token,id.owner),l=d.ok?await logs(id.token,id.owner):null,receipt=l?.ok?parseReceipt(payload(l)):null,pass=receiptPass(receipt);
+  return{ok:pass,selftest:"modelscope-studio-lite",configured:true,authenticated:true,target_hardware:TARGET_HARDWARE,hardware:target,catalog_verified:Boolean(target),stock_available:target?.has_stock===true,studio_found:d.ok,studio_detail_http_status:d.status,log_http_status:l?.status||null,runtime_receipt:cleanReceipt(receipt),runtime_e2e_verified:pass,route_eligible:pass&&Boolean(target),error_class:pass?null:!d.ok?`MODELSCOPE_STUDIO_DETAIL_HTTP_${d.status}`:!l?.ok?`MODELSCOPE_STUDIO_LOG_HTTP_${l?.status||0}`:"MODELSCOPE_STUDIO_LITE_NOT_VERIFIED",free_only:true,paid_fallback:false,secrets_redacted:true};
 }
 
 export async function prepareModelScopeStudioLite(env={}){
-  const r=await readiness(env),t=token(env);
+  const r=await readiness(env),t=r.token;
   if(!r.ok)return{ok:false,stage:"readiness",error_class:r.error_class,hardware:r.target||null,free_only:true,paid_fallback:false,secrets_redacted:true};
   let d=await detail(t,r.owner),created=false;
   if(!d.ok){
@@ -81,7 +85,7 @@ export async function prepareModelScopeStudioLite(env={}){
 }
 
 export async function deployModelScopeStudioLite(env={}){
-  const r=await readiness(env),t=token(env);
+  const r=await readiness(env),t=r.token;
   if(!r.ok)return{ok:false,stage:"readiness",error_class:r.error_class,hardware:r.target||null,free_only:true,paid_fallback:false,secrets_redacted:true};
   const d=await detail(t,r.owner);if(!d.ok)return{ok:false,stage:"detail",error_class:`MODELSCOPE_STUDIO_DETAIL_HTTP_${d.status}`,hardware:r.target,free_only:true,paid_fallback:false,secrets_redacted:true};
   const dep=await deploy(t,r.owner);
@@ -89,20 +93,19 @@ export async function deployModelScopeStudioLite(env={}){
 }
 
 export async function stopModelScopeStudioLite(env={}){
-  const r=await readiness(env),t=token(env);
-  if(!r.ok)return{ok:false,stage:"readiness",error_class:r.error_class,free_only:true,paid_fallback:false,secrets_redacted:true};
-  const s=await stop(t,r.owner);
-  return{succeeded:s.ok,ok:s.ok,stage:s.ok?"stopped":"stop-failed",stop_http_status:s.status,error_class:s.ok?null:`MODELSCOPE_STUDIO_STOP_HTTP_${s.status}`,free_only:true,paid_fallback:false,secrets_redacted:true};
+  const id=await identity(env);if(!id.ok)return{ok:false,stage:"identity",error_class:id.error_class,free_only:true,paid_fallback:false,secrets_redacted:true};
+  const s=await stop(id.token,id.owner);
+  return{ok:s.ok,stage:s.ok?"stopped":"stop-failed",stop_http_status:s.status,error_class:s.ok?null:`MODELSCOPE_STUDIO_STOP_HTTP_${s.status}`,free_only:true,paid_fallback:false,secrets_redacted:true};
 }
 
 export async function runModelScopeStudioLiteBootstrap(env={}){
   const prep=await prepareModelScopeStudioLite(env);if(!prep.ok)return prep;
   const dep=await deployModelScopeStudioLite(env);if(!dep.ok){await stopModelScopeStudioLite(env);return dep}
-  const r=await readiness(env),t=token(env);if(!r.ok){await stopModelScopeStudioLite(env);return{...r,stage:"post-deploy-readiness",free_only:true,paid_fallback:false,secrets_redacted:true}}
+  const id=await identity(env);if(!id.ok){await stopModelScopeStudioLite(env);return{...id,stage:"post-deploy-identity",free_only:true,paid_fallback:false,secrets_redacted:true}}
   let receipt=null,lastLogStatus=0;
-  for(let i=0;i<25;i++){await sleep(3000);const l=await logs(t,r.owner);lastLogStatus=l.status;if(l.ok){receipt=parseReceipt(payload(l));if(receipt)break}}
+  for(let i=0;i<25;i++){await sleep(3000);const l=await logs(id.token,id.owner);lastLogStatus=l.status;if(l.ok){receipt=parseReceipt(payload(l));if(receipt)break}}
   const stopped=await stopModelScopeStudioLite(env),pass=receiptPass(receipt);
-  return{ok:pass,stage:pass?"runtime-verified":"runtime-not-verified",studio_created:prep.studio_created,upload_action:prep.upload_action,upload_http_status:prep.upload_http_status,settings_http_status:prep.settings_http_status,deploy_http_status:dep.deploy_http_status,log_http_status:lastLogStatus,stop_http_status:stopped.stop_http_status,hardware:r.target,runtime_receipt:cleanReceipt(receipt),free_only:true,paid_fallback:false,secrets_redacted:true,error_class:pass?null:"MODELSCOPE_STUDIO_LITE_RUNTIME_E2E_FAILED"};
+  return{ok:pass,stage:pass?"runtime-verified":"runtime-not-verified",studio_created:prep.studio_created,upload_action:prep.upload_action,upload_http_status:prep.upload_http_status,settings_http_status:prep.settings_http_status,deploy_http_status:dep.deploy_http_status,log_http_status:lastLogStatus,stop_http_status:stopped.stop_http_status,hardware:prep.hardware,runtime_receipt:cleanReceipt(receipt),free_only:true,paid_fallback:false,secrets_redacted:true,error_class:pass?null:"MODELSCOPE_STUDIO_LITE_RUNTIME_E2E_FAILED"};
 }
 
-export const modelScopeStudioLiteMeta=()=>({provider:"modelscope",repo_name:REPO_NAME,sdk_type:SDK_TYPE,target_hardware:TARGET_HARDWARE,nominal_cpu:TARGET_CPU,nominal_memory_gb:TARGET_MEMORY_GB,min_effective_cpu:MIN_EFFECTIVE_CPU,min_effective_memory_gib:MIN_EFFECTIVE_MEMORY_GIB,revision:REVISION,phased_runner:true,idempotent_upload:true,free_only:true,paid_fallback:false});
+export const modelScopeStudioLiteMeta=()=>({provider:"modelscope",repo_name:REPO_NAME,sdk_type:SDK_TYPE,target_hardware:TARGET_HARDWARE,nominal_cpu:TARGET_CPU,nominal_memory_gb:TARGET_MEMORY_GB,min_effective_cpu:MIN_EFFECTIVE_CPU,min_effective_memory_gib:MIN_EFFECTIVE_MEMORY_GIB,revision:REVISION,phased_runner:true,idempotent_upload:true,stop_requires_hardware_catalog:false,free_only:true,paid_fallback:false});
