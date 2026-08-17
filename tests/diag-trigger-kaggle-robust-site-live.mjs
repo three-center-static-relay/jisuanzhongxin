@@ -11,4 +11,4 @@ assert.equal(body.route_eligible,true);
 assert.equal(body.business_e2e,false);
 assert.equal(body.business_e2e_current,false);
 assert.equal(body.business_e2e_historically_verified,true);
-console.log(JSON.stringify({ok:true,suite:"diag-kaggle-live-health",http_status:200,authenticated:true,current_live_health_verified:true,route_eligible:true,business_e2e_current:false,historical_e2e:true}));
+console.log(JSON.stringify({ok:true,suite:"diag-kaggle-live-health-v2",read_only:true,http_status:200,authenticated:true,current_live_health_verified:true,route_eligible:true,business_e2e_current:false,historical_e2e:true}));
