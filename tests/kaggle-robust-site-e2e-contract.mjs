@@ -49,4 +49,4 @@ assert.match(wrangler,/kaggle-robust-site-e2e-contract\.mjs/);
 assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
 assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
 
-console.log(JSON.stringify({ok:true,suite:"kaggle-robust-site-acceptance-history",task_id:ev.task_id,model_id:ev.model_id,fresh_e2e_verified:false,task_created:false,task_absence_http_status:404,current_auth_health_verified_after_attempt:true,result_digest:null,retry_performed:false,acceptance_wrapper_removed:true,production_promoted:false}));
+console.log(JSON.stringify({ok:true,suite:"kaggle-robust-site-acceptance-history",cleanup_contract:"v1",task_id:ev.task_id,model_id:ev.model_id,fresh_e2e_verified:false,task_created:false,task_absence_http_status:404,current_auth_health_verified_after_attempt:true,result_digest:null,retry_performed:false,acceptance_wrapper_removed:true,production_promoted:false}));
