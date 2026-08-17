@@ -4,7 +4,8 @@
   "scripts": {
     "stress": "node tests/stress.mjs",
     "test:inference-hardening": "node tests/inference-hardening.mjs",
-    "test:commercial-spatial-advanced": "node tests/commercial-spatial-advanced.mjs"
+    "test:commercial-spatial-advanced": "node tests/commercial-spatial-advanced.mjs",
+    "test:commercial-spatial-signal": "node tests/commercial-spatial-signal.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0",
