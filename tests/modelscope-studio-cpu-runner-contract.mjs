@@ -20,16 +20,16 @@ for(const literal of [
   "THREE_CENTER_MODELSCOPE_CPU_RUNTIME:",
   "square_sum_correct",
   "/stop"
-]) assert.ok(studio.includes(literal),`Missing Studio safety contract: ${literal}`);
+]) assert.ok(studio.includes(literal),`Missing full Studio safety contract: ${literal}`);
 
 for(const literal of [
   "/v1/selftest/modelscope-studio",
-  "/v1/admin/modelscope/studio-bootstrap",
-  "url.hostname!==\"compute.internal\"",
-  "STUDIO_BOOTSTRAP_CRON=\"*/5 * * * *\""
-]) assert.ok(entry.includes(literal),`Missing admin/cron contract: ${literal}`);
+  "getModelScopeStudioStatus"
+]) assert.ok(entry.includes(literal),`Missing read-only full Studio status contract: ${literal}`);
 
-assert.ok(wrangler.includes("*/5 * * * *"),"Temporary Studio bootstrap cron not configured");
-assert.ok(!entry.includes('req.method==="POST"&&url.pathname==="/v1/selftest/modelscope-studio"'),"Public selftest must not be a write endpoint");
+assert.ok(!entry.includes("runModelScopeStudioBootstrap"),"Legacy 8-core bootstrap must not be production-routable");
+assert.ok(!entry.includes("/v1/admin/modelscope/studio-bootstrap"),"Legacy 8-core admin bootstrap route must remain removed");
+assert.ok(!wrangler.includes("*/5 * * * *"),"Temporary 5-minute Studio bootstrap cron must remain removed");
+assert.ok(!entry.includes('req.method===\"POST\"&&url.pathname===\"/v1/selftest/modelscope-studio\"'),"Public full Studio selftest must remain read-only");
 
-console.log(JSON.stringify({ok:true,suite:"modelscope-studio-cpu-runner-contract",module_imported:true,min_cpu:8,min_memory_gb:30,free_only:true,paid_fallback:false,private_studio:true,public_write_endpoint:false,temporary_cron:true}));
+console.log(JSON.stringify({ok:true,suite:"modelscope-studio-cpu-runner-contract",module_imported:true,min_cpu:8,min_memory_gb:30,free_only:true,paid_fallback:false,private_studio:true,public_write_endpoint:false,bootstrap_routable:false,temporary_cron:false}));
