@@ -2,6 +2,7 @@ const TOKEN_URL="https://identity.dataspace.copernicus.eu/auth/realms/CDSE/proto
 const CORE_BASE="https://openeo.dataspace.copernicus.eu/openeo/1.2";
 const FED_BASE="https://openeofed.dataspace.copernicus.eu/openeo/1.2";
 const OIDC_PROVIDER_ID="CDSE";
+const OIDC_SCOPE="email openid";
 let cached={access_token:"",expires_at:0};
 
 function cfg(env){
@@ -29,7 +30,7 @@ async function accessToken(env){
   if(!c.configured)return {configured:false};
   const now=Math.floor(Date.now()/1000);
   if(cached.access_token&&cached.expires_at>now+60)return {configured:true,token:cached.access_token,cached:true};
-  const body=new URLSearchParams({grant_type:"client_credentials",client_id:c.clientId,client_secret:c.clientSecret}).toString();
+  const body=new URLSearchParams({grant_type:"client_credentials",client_id:c.clientId,client_secret:c.clientSecret,scope:OIDC_SCOPE}).toString();
   const j=await fetchJson(TOKEN_URL,{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body});
   if(!j.access_token)throw Object.assign(new Error("OPENEO_OAUTH_TOKEN_MISSING"),{status:502});
   const expires=Math.max(120,Number(j.expires_in)||300);
@@ -71,6 +72,7 @@ export const openEOMeta=()=>({
   federation_endpoint:FED_BASE,
   auth:"oidc-client-credentials",
   oidc_provider_id:OIDC_PROVIDER_ID,
+  oidc_scope:OIDC_SCOPE,
   machine_to_machine:true,
   generic_python:false,
   processing_class:"earth-observation-datacube"
