@@ -7,20 +7,18 @@ const timer=setTimeout(()=>controller.abort(),30000);
 try {
   const r=await fetch(url,{method:"GET",headers:{accept:"application/json"},signal:controller.signal});
   const body=await r.json();
-  const groupA=new Set([
+  const groupA1=new Set([
     "BAIDU_COMPUTE_CREDIT_INSUFFICIENT",
     "BAIDU_SUBMIT_ACCESS_DENIED",
-    "BAIDU_CODE_UPLOAD_FAILED",
-    "BAIDU_CREATE_CALLBACK_FAILED",
-    "BAIDU_BOSACL_FAILED"
+    "BAIDU_CODE_UPLOAD_FAILED"
   ]);
   assert.equal(r.status,200);
   assert.equal(body.ok,false);
   assert.equal(body.task?.status,"failed");
   assert.equal(body.task?.bridge_stage,"aistudio_submit_returned");
-  assert.equal(groupA.has(body.task?.failure_class),true);
+  assert.equal(groupA1.has(body.task?.failure_class),true);
   assert.equal(body.task?.result_digest,null);
   assert.equal(body.task?.bridge_result_retrieved,false);
   assert.equal(body.task?.production_promoted,false);
-  console.log(JSON.stringify({ok:true,suite:"diag-p24c-sdk039-business-group-a",failure_class:body.task.failure_class,bridge_stage:body.task.bridge_stage}));
+  console.log(JSON.stringify({ok:true,suite:"diag-p24c-sdk039-business-group-a1",failure_class:body.task.failure_class}));
 } finally { clearTimeout(timer); }
