@@ -1,25 +1,28 @@
 import assert from "node:assert/strict";
 
-// Diagnostic-only one-shot trigger; fixed production task id prevents duplicate Baidu jobs.
-const url="https://compute-worker.a15280020511.workers.dev/__acceptance/baidu-v100-p24c-sdk039-20260817-0384d41bd74495a633af72ee3a0ba1b03b064a83776dea891af8d741368151fa";
+// Status-only diagnostic. This file must never call the P24c acceptance trigger again.
+const url="https://compute-worker.a15280020511.workers.dev/__diagnostic/baidu-v100-p24c-sdk039-result-20260817-16949c117c8ccea6136c971cd31e4333b603dd89372c1ceefd0be852a96a03f0";
 const controller=new AbortController();
 const timer=setTimeout(()=>controller.abort(),30000);
 try{
   const r=await fetch(url,{method:"GET",headers:{accept:"application/json"},signal:controller.signal});
   const body=await r.json();
-  assert.equal(r.status,202);
-  assert.equal(body.ok,true);
-  assert.equal(body.task_id,"baidu-circleci-live-20260817p24c-sdk039");
-  assert.equal(body.status,"bridge_submitted");
+  assert.ok([200,202].includes(r.status));
+  assert.equal(body.diagnostic,true);
   assert.equal(body.runtime,"paddle2.4_py3.7");
   assert.equal(body.sdk_version,"0.3.9");
-  assert.equal(body.device,"v100");
-  assert.equal(body.gpus,1);
-  assert.equal(body.payment,"coupon");
   assert.equal(body.one_shot,true);
-  assert.equal(body.automatic_retry,false);
-  assert.equal(body.production_promoted,false);
-  console.log(JSON.stringify({ok:true,suite:"diag-trigger-p24c-sdk039-live",http_status:r.status,task_id:body.task_id,status:body.status,runtime:body.runtime,sdk_version:body.sdk_version,device:body.device,gpus:body.gpus,payment:body.payment,one_shot:body.one_shot,automatic_retry:body.automatic_retry,production_promoted:body.production_promoted}));
+  assert.equal(body.task?.task_id,"baidu-circleci-live-20260817p24c-sdk039");
+  assert.equal(body.task?.runtime_candidate,"paddle2.4_py3.7");
+  assert.equal(body.task?.sdk_candidate,"0.3.9");
+  assert.equal(body.task?.device,"v100");
+  assert.equal(body.task?.gpus,1);
+  assert.equal(body.task?.payment,"coupon");
+  assert.equal(body.task?.one_shot,true);
+  assert.equal(body.task?.automatic_retry,false);
+  assert.equal(body.task?.production_promoted,false);
+  assert.ok(["bridge_dispatching","bridge_submitted","running","completed","failed","cancelled"].includes(body.task?.status));
+  console.log(JSON.stringify({ok:true,suite:"diag-read-p24c-sdk039-live",http_status:r.status,task_id:body.task.task_id,status:body.task.status,runtime:body.task.runtime_candidate,sdk_version:body.task.sdk_candidate,device:body.task.device,gpus:body.task.gpus,payment:body.task.payment,bridge_stage:body.task.bridge_stage,failure_class:body.task.failure_class,result_digest_present:Boolean(body.task.result_digest),bridge_result_retrieved:body.task.bridge_result_retrieved===true,verification:body.task.verification||null,production_promoted:body.task.production_promoted}));
 } finally {
   clearTimeout(timer);
 }
