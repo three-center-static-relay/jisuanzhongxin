@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+// Post-PR trigger only; no runtime semantics.
 const BASE="https://compute-worker.a15280020511.workers.dev";
 async function get(path){const c=new AbortController(),t=setTimeout(()=>c.abort(),30000);try{const r=await fetch(`${BASE}${path}`,{headers:{accept:"application/json"},signal:c.signal});const b=await r.json().catch(()=>null);return{status:r.status,body:b};}finally{clearTimeout(t)}}
 const health=await get("/v1/providers/baidu/health");
