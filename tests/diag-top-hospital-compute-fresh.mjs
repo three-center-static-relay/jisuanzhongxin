@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+// Diagnostic-only fresh production readiness; current gate may temporarily run contract-only isolation.
 const BASE="https://compute-worker.a15280020511.workers.dev";
 const img=await fetch(`${BASE}/v1/toolkits/medical-imaging/meta`,{headers:{accept:"application/json"}});const im=await img.json().catch(()=>null);
 assert.equal(img.status,200,`IMAGING_META_HTTP_${img.status}:${JSON.stringify(im)}`);assert.equal(im?.ok,true);assert.equal(im?.framework,"MONAI");assert.equal(im?.target_version,"1.6.0");assert.equal(im?.gpu_optional,true);
