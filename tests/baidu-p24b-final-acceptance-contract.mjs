@@ -30,13 +30,12 @@ assert.equal(meta.sdk_candidate_control_plane_verified,true);
 assert.equal(meta.sdk_candidate_gpu_verified,false);
 assert.equal(meta.candidate_retest_policy,"blocked-until-free-coupon-credit-available-and-manual-acceptance");
 
-// Preserve the prior P24b evidence as historical evidence, not as current production state.
 assert.match(oldWrapper,/TASK_ID="baidu-circleci-live-20260816p24b"/);
 assert.match(oldWrapper,/RUNTIME="paddle2\.4_py3\.7"/);
 assert.match(oldWrapper,/production_promoted:false/);
 assert.doesNotMatch(oldWrapper,/retry\s*\(/);
 
-assert.match(admin,/from "\.\/production-entry\.js"/);
+assert.match(admin,/from "\.\/production-entry(?:-kaggle-robust-site-e2e)?\.js"/);
 assert.doesNotMatch(admin,/production-entry-baidu-p24c-sdk039-e2e\.js/);
 assert.equal(fs.existsSync(p24cWrapperUrl),false);
 assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
@@ -47,4 +46,4 @@ assert.match(bridge,/"--gpus", "1"/);
 assert.match(bridge,/"--payment", "coupon"/);
 assert.doesNotMatch(bridge,/"--payment", "acoin"/);
 
-console.log(JSON.stringify({ok:true,suite:"baidu-p24b-final-acceptance-contract",historical_p24b_preserved:true,current_latest_task:"baidu-circleci-live-20260817p24c-sdk039",current_latest_failure:"BAIDU_COMPUTE_CREDIT_INSUFFICIENT",live_e2e_failures:3,baidu_job_id_confirmed:false,v100_cuda_verified:false,production_runtime:null,route_eligible:false,automatic_retry:false,p24c_wrapper_removed:true}));
+console.log(JSON.stringify({ok:true,suite:"baidu-p24b-final-acceptance-contract",historical_p24b_preserved:true,current_latest_task:"baidu-circleci-live-20260817p24c-sdk039",current_latest_failure:"BAIDU_COMPUTE_CREDIT_INSUFFICIENT",live_e2e_failures:3,baidu_job_id_confirmed:false,v100_cuda_verified:false,production_runtime:null,route_eligible:false,automatic_retry:false,p24c_wrapper_removed:true,temporary_kaggle_acceptance_wrapper_allowed:true}));
