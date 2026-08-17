@@ -1,5 +1,5 @@
 import guard,{CenterGate} from "./guard.js";
-import {probeOpenEO,openEOMeta} from "./openeo.js";
+import {probeOpenEO,openEOMeta,startOpenEOAcceptanceJob,getOpenEOAcceptanceJob} from "./openeo.js";
 import {probeBaiduAIStudio,baiduAIStudioMeta} from "./baidu-aistudio.js";
 import {probeEarthEngine,stressEarthEngine} from "./google-ee.js";
 import {introspect as kaggleIntrospect,officialMeta as kaggleOfficialMeta} from "./kaggle-official.js";
@@ -8,12 +8,18 @@ import {modelscopeMeta,planModelScopeRoute,probeModelScope} from "./modelscope-c
 export {CenterGate};
 
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
+const OPENEO_E2E_PATH="/__diag/openeo-link-e2e-20260817";
+const OPENEO_E2E_KEY_SHA256="e5f69630fbe387e8b038c1f9e6f32ff6e659eb1da964e8a0c5f195ef10e5b4bc";
 let openEOHealth={at:0,value:null};
 let baiduHealth={at:0,value:null};
 let googleEEHealth={at:0,value:null};
 let kaggleHealth={at:0,value:null};
 let wolframHealth={at:0,value:null};
 let modelscopeHealth={at:0,value:null};
+
+async function sha256Hex(v){const h=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(v||"")));return[...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+async function openEOE2EAuthorized(req){return await sha256Hex(req.headers.get("x-openeo-e2e-key")||"")===OPENEO_E2E_KEY_SHA256}
+function openEOE2EError(e){return json({ok:false,error_class:String(e?.message||"OPENEO_E2E_FAILED"),http_status:Number(e?.status||0)||null,upstream_code:e?.details?.code||null,upstream_message:e?.details?.message||null,secret_echo:false},Number(e?.status||0)>=400&&Number(e?.status||0)<600?Number(e.status):503)}
 
 async function openEOProbe(env){const now=Date.now();if(openEOHealth.value&&now-openEOHealth.at<300000)return {...openEOHealth.value,cached_health:true};try{const p=await probeOpenEO(env,{federated:false});const value={ok:p.ok===true,provider:"copernicus-openeo",configured:p.configured===true,authenticated:p.authenticated===true,endpoint:p.endpoint||"core-cdse",account_visible:p.account_visible===true,budget_reported:p.budget_reported===true,api_version:p.api_version||"unknown",backend_id:p.backend_id||"",secret_echo:false};openEOHealth={at:now,value};return value}catch(e){const value={ok:false,provider:"copernicus-openeo",configured:Boolean(env.CDSE_CLIENT_ID&&env.CDSE_CLIENT_SECRET),authenticated:false,error_class:String(e?.message||"OPENEO_PROBE_FAILED"),http_status:Number(e?.status||0)||null,secret_echo:false};openEOHealth={at:now,value};return value}}
 async function baiduProbe(env){const now=Date.now();if(baiduHealth.value&&now-baiduHealth.at<300000)return {...baiduHealth.value,cached_health:true};const value=await probeBaiduAIStudio(env);baiduHealth={at:now,value};return value}
@@ -24,6 +30,7 @@ async function modelscopeProbe(env){const now=Date.now();if(modelscopeHealth.val
 async function googleEESelftest(env){try{const tiny=await probeEarthEngine(env,{compute:true}),stress=await stressEarthEngine(env),ok=tiny.ok===true&&tiny.compute_ok===true&&stress.ok===true;return{status:ok?200:503,body:{ok,provider:"google-earth-engine",business_e2e:true,tiny_compute_ok:tiny.compute_ok===true,parallel_requests:stress.parallel_requests,parallel_all_correct:stress.parallel_all_correct===true,parallel_http_statuses:stress.parallel_http_statuses,geospatial_graph_ok:stress.geospatial_graph_ok===true,negative_request_rejected:stress.negative_request_rejected===true,negative_http_status:stress.negative_http_status,elapsed_ms:stress.elapsed_ms,secret_echo:false}}}catch(e){return{status:503,body:{ok:false,provider:"google-earth-engine",business_e2e:true,error_class:String(e?.message||"GOOGLE_EE_SELFTEST_FAILED"),http_status:Number(e?.status||0)||null,secret_echo:false}}}}
 
 export default {async fetch(req,env,ctx){const u=new URL(req.url);
+  if(u.pathname===OPENEO_E2E_PATH){if(!(await openEOE2EAuthorized(req)))return json({ok:false,error:"NOT_FOUND"},404);try{if(req.method==="POST")return json(await startOpenEOAcceptanceJob(env));if(req.method==="GET"){const jobId=u.searchParams.get("job_id")||"";return json(await getOpenEOAcceptanceJob(env,jobId));}return json({ok:false,error:"METHOD_NOT_ALLOWED"},405)}catch(e){return openEOE2EError(e)}}
   if(req.method==="GET"&&u.pathname==="/v1/providers/openeo/meta")return json({ok:true,provider:"copernicus-openeo",...openEOMeta(),secret_echo:false});
   if(req.method==="GET"&&u.pathname==="/v1/providers/openeo/health"){const p=await openEOProbe(env);return json(p,p.ok?200:503)}
   if(req.method==="GET"&&u.pathname==="/v1/providers/baidu/meta")return json({ok:true,...baiduAIStudioMeta(),acceptance_state:"manual-auth-only-not-production",native_http_candidate:false,unattended_e2e_verified:false,route_eligible:false,secret_echo:false});
