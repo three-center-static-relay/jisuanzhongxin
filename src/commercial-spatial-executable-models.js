@@ -1,3 +1,4 @@
+export const COMMERCIAL_SPATIAL_EXECUTABLE_MODEL_CATALOG_VERSION="commercial-spatial-executable-v1-20260817";
 export const COMMERCIAL_SPATIAL_EXECUTABLE_MODEL_IDS=Object.freeze({
   "location_intelligence.commercial_spatial_fusion":{method:"commercial_spatial_fusion",recipe_family:"commercial_spatial_fusion"},
   "location_intelligence.spatial_feature_fusion":{method:"spatial_feature_fusion",recipe_family:"geospatial_commercial_feature_fusion"},
