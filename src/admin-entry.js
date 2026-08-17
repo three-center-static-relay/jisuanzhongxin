@@ -3,14 +3,13 @@ import {getAutonomySnapshot,runAutonomySweep} from "./provider-autonomy.js";
 import {getModelScopeRuntimeSnapshot,runModelScopeRuntimeSweep} from "./modelscope-runtime-monitor.js";
 import {probeModelScope} from "./modelscope-compute.js";
 import {modelScopeInferenceCanary} from "./modelscope-inference.js";
-import {getModelScopeStudioStatus,runModelScopeStudioBootstrap} from "./modelscope-studio.js";
-import {getModelScopeStudioHardwareShape} from "./modelscope-studio-hardware-debug.js";
+import {getModelScopeStudioStatus} from "./modelscope-studio.js";
+import {getModelScopeStudioLiteStatus,runModelScopeStudioLiteBootstrap} from "./modelscope-studio-lite.js";
 export {CenterGate};
 
 const ORIGIN="https://compute.internal";
 const SERVICE="compute-worker";
-const STUDIO_BOOTSTRAP_CRON="*/5 * * * *";
-const STUDIO_BOOTSTRAP_ONCE_HEADER="studio-cpu-once-v1-20260817";
+const STUDIO_LITE_ONCE_HEADER="studio-lite-once-v1-20260817";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
 async function readApp(path,env,ctx){
@@ -80,10 +79,15 @@ async function modelScopeStudioSelftest(env){
   return json(p,p.runtime_e2e_verified===true?200:503);
 }
 
-async function modelScopeStudioBootstrapOnce(req,env){
-  if(req.headers.get("x-three-center-selftest")!==STUDIO_BOOTSTRAP_ONCE_HEADER)return json({ok:false,error:"POLICY_DENIED",selftest:"modelscope-studio-bootstrap-once",free_only:true,paid_fallback:false,secrets_redacted:true},403);
-  const p=await runModelScopeStudioBootstrap(env);
-  return json({...p,selftest:"modelscope-studio-bootstrap-once",free_only:true,paid_fallback:false,secrets_redacted:true},p.ok===true?200:503);
+async function modelScopeStudioLiteSelftest(env){
+  const p=await getModelScopeStudioLiteStatus(env);
+  return json(p,p.runtime_e2e_verified===true?200:503);
+}
+
+async function modelScopeStudioLiteBootstrapOnce(req,env){
+  if(req.headers.get("x-three-center-selftest")!==STUDIO_LITE_ONCE_HEADER)return json({ok:false,error:"POLICY_DENIED",selftest:"modelscope-studio-lite-bootstrap-once",free_only:true,paid_fallback:false,secrets_redacted:true},403);
+  const p=await runModelScopeStudioLiteBootstrap(env);
+  return json({...p,selftest:"modelscope-studio-lite-bootstrap-once",free_only:true,paid_fallback:false,secrets_redacted:true},p.ok===true?200:503);
 }
 
 async function adminContext(env,ctx){
@@ -104,8 +108,8 @@ export default{
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-runtime")return modelScopeRuntimeSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-inference")return modelScopeInferenceSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio")return modelScopeStudioSelftest(env);
-    if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio-hardware-shape")return json(await getModelScopeStudioHardwareShape(env));
-    if(req.method==="POST"&&url.pathname==="/v1/selftest/modelscope-studio-bootstrap-once")return modelScopeStudioBootstrapOnce(req,env);
+    if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio-lite")return modelScopeStudioLiteSelftest(env);
+    if(req.method==="POST"&&url.pathname==="/v1/selftest/modelscope-studio-lite-bootstrap-once")return modelScopeStudioLiteBootstrapOnce(req,env);
     if(req.method==="GET"&&url.pathname==="/v1/admin/context"){
       if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"admin context is service-binding internal only"},403);
       return adminContext(env,ctx);
@@ -118,18 +122,14 @@ export default{
       if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"ModelScope runtime status is service-binding internal only"},403);
       return json(await getModelScopeRuntimeSnapshot(env));
     }
-    if(req.method==="POST"&&url.pathname==="/v1/admin/modelscope/studio-bootstrap"){
-      if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"ModelScope Studio bootstrap is service-binding internal only"},403);
-      const result=await runModelScopeStudioBootstrap(env);
+    if(req.method==="POST"&&url.pathname==="/v1/admin/modelscope/studio-lite-bootstrap"){
+      if(url.hostname!=="compute.internal")return json({ok:false,error:"POLICY_DENIED",message:"ModelScope Studio Lite bootstrap is service-binding internal only"},403);
+      const result=await runModelScopeStudioLiteBootstrap(env);
       return json(result,result.ok===true?200:503);
     }
     return app.fetch(req,env,ctx);
   },
   async scheduled(controller,env,ctx){
-    if(controller?.cron===STUDIO_BOOTSTRAP_CRON){
-      ctx.waitUntil(runModelScopeStudioBootstrap(env));
-      return;
-    }
     ctx.waitUntil(Promise.all([runAutonomySweep(app,env,ctx),runModelScopeRuntimeSweep(env)]));
   }
 };
