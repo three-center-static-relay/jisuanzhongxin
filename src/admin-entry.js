@@ -6,6 +6,7 @@ import {modelScopeInferenceCanary} from "./modelscope-inference.js";
 import {getModelScopeStudioStatus} from "./modelscope-studio.js";
 import {getModelScopeStudioLiteStatus,runModelScopeStudioLiteBootstrap,prepareModelScopeStudioLite,deployModelScopeStudioLite,stopModelScopeStudioLite} from "./modelscope-studio-lite.js";
 import {ModelScopeStudioLiteWorkflow} from "./modelscope-studio-workflow.js";
+import {intelligenceFreeStatusBridge} from "./intelligence-free-status-bridge.js";
 export {CenterGate,ModelScopeStudioLiteWorkflow};
 
 const ORIGIN="https://compute.internal";
@@ -70,6 +71,7 @@ async function getStudioLiteWorkflow(env,url){
 export default{
   async fetch(req,env,ctx){
     const url=new URL(req.url);
+    if(req.method==="GET"&&url.pathname==="/v1/selftest/intelligence-free-model-status")return intelligenceFreeStatusBridge(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-runtime")return modelScopeRuntimeSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-inference")return modelScopeInferenceSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio")return modelScopeStudioSelftest(env);
