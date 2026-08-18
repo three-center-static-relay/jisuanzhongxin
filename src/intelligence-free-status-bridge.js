@@ -28,6 +28,7 @@ export async function intelligenceFreeStatusBridge(env){
   const keyPresent=access?.key_present===true;
   const registrationRequired=access?.registration_required===true;
   const registrationLogicOk=vendor?.vendor_free_verified===true&&registrationRequired===!keyPresent;
+  const routerEvidenceAvailable=typeof result?.router_evidence_available==="boolean"?result.router_evidence_available:null;
 
   const checks={
     http_200:response.status===200,
@@ -43,7 +44,8 @@ export async function intelligenceFreeStatusBridge(env){
     vendor_status:vendor?.vendor_free_status==="vendor_confirmed_free",
     required_secret:access?.required_secret==="ZAI_API_KEY",
     registration_logic:registrationLogicOk,
-    paid_fallback_disabled:result?.paid_fallback_allowed===false
+    paid_fallback_disabled:result?.paid_fallback_allowed===false,
+    new_router_degradation_shape:routerEvidenceAvailable!==null
   };
   const strictPass=Object.values(checks).every(bool);
 
@@ -58,6 +60,8 @@ export async function intelligenceFreeStatusBridge(env){
     result_digest:body?.result_digest||null,
     final_free_status:result?.final_free_status||null,
     recommended_access:result?.recommended_access||null,
+    router_evidence_available:routerEvidenceAvailable,
+    router_error:result?.router_error||null,
     vendor_free_verified:vendor?.vendor_free_verified===true,
     vendor_free_status:vendor?.vendor_free_status||null,
     vendor_source_type:vendor?.evidence?.source_type||null,
