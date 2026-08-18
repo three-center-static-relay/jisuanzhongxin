@@ -10,10 +10,16 @@ for(const capability of manifest.capabilities){
   assert.match(capability.id,/^[a-z0-9][a-z0-9._:-]+$/);
   assert.ok(capability.operations.length>0);
   assert.equal(capability.write_scope,"none");
-  assert.equal(capability.trust.level,"T2");
-  assert.equal(capability.cost.unit_cost,0);
+  assert.equal(capability.trust.level,"T0");
+  assert.ok(["unverified","quarantined"].includes(capability.trust.status));
+  assert.ok(["configured-unverified","unconfigured"].includes(capability.verification.status));
+  assert.equal(capability.verification.receipt_digest,null);
+  assert.equal(capability.last_verified,null);
+  assert.equal(capability.cost.unit_cost,null);
+  assert.equal(capability.cost.estimate_status,"unknown");
   assert.equal(ids.has(capability.id),false);ids.add(capability.id);
 }
-assert.equal(manifest.capabilities.find(x=>x.id==="compute.cpu").health.status,"ready");
+assert.equal(manifest.capabilities.find(x=>x.id==="compute.cpu").health.status,"configured-unverified");
+assert.equal(manifest.backend_summary.runtime_verified,0);
 assert.doesNotMatch(JSON.stringify(manifest),/token|password|authorization|cookie|api.?key/i);
 console.log(JSON.stringify({ok:true,suite:"capability-manifest-contract",center:"compute",capability_count:manifest.capabilities.length}));

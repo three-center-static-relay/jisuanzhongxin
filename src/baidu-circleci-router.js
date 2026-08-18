@@ -8,10 +8,10 @@ const int=(v,d)=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n):d};
 const SAFE_STAGES=new Set(["circleci_started","aistudio_authenticated","aistudio_submit_returned","baidu_submitted","result_polling","result_retrieved","baidu_terminal_failed"]);
 const SAFE_UPSTREAM_KEYS=new Set(["stage","status","state","jobStatus","pipelineStatus","errorCode","errorMsg","errorMessage","message","reason","failReason","failureReason","exitCode","createTime","updateTime","finishTime","endTime","env","runtime","device","resourceType"]);
 
-function gate(env){return env.CENTER_GATE.get(env.CENTER_GATE.idFromName("global"))}
-async function g(env,p,m="GET",b){const i={method:m,headers:{"content-type":"application/json"}};if(b!==undefined)i.body=JSON.stringify(b);const r=await gate(env).fetch(new Request(`https://gate.internal${p}`,i));return{http:r.status,...await r.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}))}}
-async function load(env,id){return g(env,`/task/${encodeURIComponent(id)}`)}
-async function save(env,id,p){return g(env,`/task/${encodeURIComponent(id)}`,"POST",p)}
+function gate(env,shard="global"){return env.CENTER_GATE.get(env.CENTER_GATE.idFromName(shard))}
+async function g(env,p,m="GET",b,shard="global"){const i={method:m,headers:{"content-type":"application/json"}};if(b!==undefined)i.body=JSON.stringify(b);const r=await gate(env,shard).fetch(new Request(`https://gate.internal${p}`,i));return{http:r.status,...await r.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}))}}
+async function load(env,id){return g(env,`/task/${encodeURIComponent(id)}`,"GET",undefined,`task:${id}`)}
+async function save(env,id,p){return g(env,`/task/${encodeURIComponent(id)}`,"POST",p,`task:${id}`)}
 async function acquire(env,id,ttl){return g(env,"/acquire","POST",{task_id:id,kind:"compute",lease_seconds:ttl})}
 async function release(env,id){return g(env,"/release","POST",{task_id:id})}
 async function sha256(v){const h=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(v||"")));return[...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("")}

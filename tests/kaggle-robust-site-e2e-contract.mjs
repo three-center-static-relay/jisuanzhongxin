@@ -6,6 +6,7 @@ import {normalizeKaggleMeta} from "../src/provider-truth.js";
 
 const admin=fs.readFileSync(new URL("../src/admin-entry.js",import.meta.url),"utf8");
 const wrangler=fs.readFileSync(new URL("../wrangler.jsonc",import.meta.url),"utf8");
+const buildGate=JSON.parse(fs.readFileSync(new URL("../package.json",import.meta.url),"utf8")).scripts?.["test:build-gate"]||"";
 const wrapperUrl=new URL("../src/production-entry-kaggle-robust-site-e2e.js",import.meta.url);
 const recipe=recipeFor("commercial.robust_site_scenario");
 const ev=KAGGLE_ACCEPTANCE_HISTORY.latest_recipe_attempt;
@@ -45,7 +46,7 @@ assert.deepEqual(meta.latest_recipe_acceptance,ev);
 assert.match(admin,/from "\.\/production-entry\.js"/);
 assert.doesNotMatch(admin,/production-entry-kaggle-robust-site-e2e\.js/);
 assert.equal(fs.existsSync(wrapperUrl),false);
-assert.match(wrangler,/kaggle-robust-site-e2e-contract\.mjs/);
+assert.match(buildGate,/kaggle-robust-site-e2e-contract\.mjs/);
 assert.match(wrangler,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["17 4 \* \* \*"\]\s*\}/);
 assert.doesNotMatch(wrangler,/"\* \* \* \* \*"/);
 
