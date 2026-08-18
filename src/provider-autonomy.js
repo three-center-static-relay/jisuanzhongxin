@@ -108,15 +108,15 @@ const definitions={
 const now=()=>new Date().toISOString();
 const int=v=>Number.isFinite(Number(v))?Math.max(0,Math.trunc(Number(v))):0;
 
-function gate(env){return env.CENTER_GATE?.get?.(env.CENTER_GATE.idFromName("global"))||null}
-async function gateCall(env,path,method="GET",body){
-  const g=gate(env);if(!g)return{ok:false,error:"CENTER_GATE_UNAVAILABLE"};
+function gate(env,shard="global"){return env.CENTER_GATE?.get?.(env.CENTER_GATE.idFromName(shard))||null}
+async function gateCall(env,path,method="GET",body,shard="global"){
+  const g=gate(env,shard);if(!g)return{ok:false,error:"CENTER_GATE_UNAVAILABLE"};
   const init={method,headers:{"content-type":"application/json"}};if(body!==undefined)init.body=JSON.stringify(body);
   const r=await g.fetch(new Request(`https://gate.internal${path}`,init));
   return{http:r.status,...await r.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}))};
 }
-async function load(env,id){return(await gateCall(env,`/task/${encodeURIComponent(STATE_PREFIX+id)}`)).task||null}
-async function save(env,id,patch){return gateCall(env,`/task/${encodeURIComponent(STATE_PREFIX+id)}`,"POST",{kind:"provider-health",provider:id,...patch})}
+async function load(env,id){return(await gateCall(env,`/task/${encodeURIComponent(STATE_PREFIX+id)}`,"GET",undefined,`state:${STATE_PREFIX+id}`)).task||null}
+async function save(env,id,patch){return gateCall(env,`/task/${encodeURIComponent(STATE_PREFIX+id)}`,"POST",{kind:"provider-health",provider:id,...patch},`state:${STATE_PREFIX+id}`)}
 
 async function call(app,path,env,ctx){
   try{

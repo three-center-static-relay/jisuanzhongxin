@@ -10,10 +10,10 @@ const DIAGNOSTIC_EXPIRES_AT=Date.parse("2026-08-16T13:30:00Z");
 const RUNTIME="paddle2.4_py3.7";
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{"cache-control":"no-store"}});
 const now=()=>new Date().toISOString();
-function gate(env){return env.CENTER_GATE.get(env.CENTER_GATE.idFromName("global"))}
-async function g(env,p,m="GET",b){const init={method:m,headers:{"content-type":"application/json"}};if(b!==undefined)init.body=JSON.stringify(b);const r=await gate(env).fetch(new Request(`https://gate.internal${p}`,init));return{http:r.status,...await r.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}))}}
-async function load(env){return g(env,`/task/${encodeURIComponent(TASK_ID)}`)}
-async function save(env,p){return g(env,`/task/${encodeURIComponent(TASK_ID)}`,"POST",p)}
+function gate(env,shard="global"){return env.CENTER_GATE.get(env.CENTER_GATE.idFromName(shard))}
+async function g(env,p,m="GET",b,shard="global"){const init={method:m,headers:{"content-type":"application/json"}};if(b!==undefined)init.body=JSON.stringify(b);const r=await gate(env,shard).fetch(new Request(`https://gate.internal${p}`,init));return{http:r.status,...await r.json().catch(()=>({ok:false,error:"GATE_BAD_RESPONSE"}))}}
+async function load(env){return g(env,`/task/${encodeURIComponent(TASK_ID)}`,"GET",undefined,`task:${TASK_ID}`)}
+async function save(env,p){return g(env,`/task/${encodeURIComponent(TASK_ID)}`,"POST",p,`task:${TASK_ID}`)}
 async function acquire(env,ttl=540){return g(env,"/acquire","POST",{task_id:TASK_ID,kind:"compute",lease_seconds:ttl})}
 async function release(env){return g(env,"/release","POST",{task_id:TASK_ID})}
 function safeTask(t){return t?{task_id:TASK_ID,status:t.status||null,executor:t.executor||null,runtime_candidate:t.runtime_candidate||RUNTIME,baidu_job_id_present:Boolean(t.baidu_job_id),bridge_stage:t.bridge_stage||null,failure_class:t.failure_class||null,upstream_diagnostic:t.upstream_diagnostic||null,result_digest:t.result_digest||null,bridge_result_retrieved:t.bridge_result_retrieved===true,verification:t.verification||null,circleci_pipeline_id_present:Boolean(t.circleci_pipeline_id),finished_at:t.finished_at||null,production_promoted:false}:null}
