@@ -49,12 +49,12 @@ async function health(env,{force=false}={}){
   }
   const value=await probeHuaweiFunctionGraph(env);
   healthCache={at:now,value};
-  return{...value,cached_health:false,cache_ttl_ms:HEALTH_TTL_MS,cache_age_ms:0,fresh_probe_requested:force,refresh_suppressed:false};
+  return{...value,cached_health:false,cache_ttl_ms:HEALTH_TTL_MS,cache_age_ms:age,fresh_probe_requested:force,refresh_suppressed:false};
 }
 
 export async function maybeHandleHuaweiFunctionGraph(req,env){
   const url=new URL(req.url);
-  if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env),deployment_probe:"no-secrets-required-v1",live_probe_scope:"service-binding-internal-only"});
+  if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env),deployment_probe:"required-secrets-restored-v1",live_probe_scope:"service-binding-internal-only"});
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/signer-selftest")return huaweiJson(await huaweiSignerSelftest());
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/auth-canary"){
