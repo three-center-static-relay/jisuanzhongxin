@@ -26,15 +26,15 @@ assert.equal(meta.secret_echo,false);
 const signed=await signHuaweiRequest({
   method:"POST",
   url:`https://functiongraph.cn-south-4.myhuaweicloud.com/v2/${project}/fgs/functions/${urn}/invocations`,
-  headers:{"content-type":"application/json","x-cff-request-version":"v1"},
+  headers:{"content-type":"application/json","x-cff-request-version":"v1","x-project-id":project},
   body:'{"selftest":"ok"}',
   ak:"AK_TEST",
   sk:"SK_TEST",
   date:new Date("2026-08-19T09:00:00.000Z")
 });
 assert.equal(signed.x_sdk_date,"20260819T090000Z");
-assert.equal(signed.signed_headers,"content-type;host;x-cff-request-version;x-sdk-date");
-assert.match(signed.authorization,/^SDK-HMAC-SHA256 Access=AK_TEST, SignedHeaders=content-type;host;x-cff-request-version;x-sdk-date, Signature=[0-9a-f]{64}$/);
+assert.equal(signed.signed_headers,"content-type;host;x-cff-request-version;x-project-id;x-sdk-date");
+assert.match(signed.authorization,/^SDK-HMAC-SHA256 Access=AK_TEST, SignedHeaders=content-type;host;x-cff-request-version;x-project-id;x-sdk-date, Signature=[0-9a-f]{64}$/);
 assert.equal(signed.authorization.includes("SK_TEST"),false);
 
 const metaResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/meta"),{});
