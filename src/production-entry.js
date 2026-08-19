@@ -35,7 +35,7 @@ async function normalizeMedicalImagingRequest(req){
   let body;try{body=await req.clone().json()}catch{return req}
   if(String(body?.profile||"")!=="medical-imaging")return req;
   const gpu=Boolean(body?.gpu);
-  body={...body,profile:gpu?"gpu":"core",input:{...(body?.input&&typeof body.input==="object"&&!Array.isArray(body?.input)?body.input:{}),medical_imaging_toolkit:true,requested_profile:"medical-imaging"}};
+  body={...body,profile:gpu?"gpu":"core",input:{...(body?.input&&typeof body.input==="object"&&!Array.isArray(body.input)?body.input:{}),medical_imaging_toolkit:true,requested_profile:"medical-imaging"}};
   const headers=new Headers(req.headers);headers.set("content-type","application/json");headers.delete("content-length");
   return new Request(req.url,{method:"POST",headers,body:JSON.stringify(body)});
 }
