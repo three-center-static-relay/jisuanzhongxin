@@ -1,22 +1,26 @@
 import {huaweiFunctionGraphMeta,huaweiJson,invokeHuaweiFunction,probeHuaweiFunctionGraph} from "./huawei-functiongraph.js";
 
 const HEALTH_TTL_MS=300000;
+const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
 let healthCache={at:0,value:null};
 
 function internalOnly(url){return url.hostname==="compute.internal"}
-async function health(env){
+async function health(env,{force=false}={}){
   const now=Date.now();
-  if(healthCache.value&&now-healthCache.at<HEALTH_TTL_MS)return{...healthCache.value,cached_health:true,cache_ttl_ms:HEALTH_TTL_MS};
+  const age=healthCache.value?Math.max(0,now-healthCache.at):Infinity;
+  if(healthCache.value&&((!force&&age<HEALTH_TTL_MS)||(force&&age<HEALTH_FORCE_MIN_INTERVAL_MS))){
+    return{...healthCache.value,cached_health:true,cache_ttl_ms:HEALTH_TTL_MS,cache_age_ms:age,fresh_probe_requested:force,refresh_suppressed:force&&age<HEALTH_FORCE_MIN_INTERVAL_MS};
+  }
   const value=await probeHuaweiFunctionGraph(env);
   healthCache={at:now,value};
-  return{...value,cached_health:false,cache_ttl_ms:HEALTH_TTL_MS};
+  return{...value,cached_health:false,cache_ttl_ms:HEALTH_TTL_MS,cache_age_ms:0,fresh_probe_requested:force,refresh_suppressed:false};
 }
 
 export async function maybeHandleHuaweiFunctionGraph(req,env){
   const url=new URL(req.url);
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env)});
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/health"){
-    const result=await health(env);
+    const result=await health(env,{force:url.searchParams.get("fresh")==="1"});
     return huaweiJson(result,result.ok===true?200:503);
   }
   if(req.method==="POST"&&url.pathname==="/v1/providers/huawei-functiongraph/compute"){
