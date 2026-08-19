@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import {webcrypto} from "node:crypto";
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 
-const {mutateHuaweiAkForControl}=await import("../src/huawei-functiongraph-diagnostic.js");
 const {classifyHuaweiError,huaweiFunctionGraphMeta,huaweiSignerSelftest,parseHuaweiFunctionUrn,signHuaweiRequest}=await import("../src/huawei-functiongraph.js");
 const {maybeHandleHuaweiFunctionGraph}=await import("../src/huawei-functiongraph-router.js");
 
@@ -50,10 +49,6 @@ assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication info
 assert.equal(classifyHuaweiError("APIGW.0302","not authorized"),"HUAWEI_IAM_NOT_AUTHORIZED");
 assert.equal(classifyHuaweiError("APIGW.0301","unknown auth detail"),"HUAWEI_IAM_AUTH_FAILED");
 
-assert.equal(mutateHuaweiAkForControl("A".repeat(20)),`B${"A".repeat(19)}`);
-assert.equal(mutateHuaweiAkForControl("Z".repeat(20)),`A${"Z".repeat(19)}`);
-assert.equal(mutateHuaweiAkForControl(""),"");
-
 const metaResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/meta"),{});
 assert.equal(metaResponse.status,200);
 const metaBody=await metaResponse.json();
@@ -89,13 +84,16 @@ assert.equal(canaryBody.canary,"list-functions-auth");
 assert.equal(canaryBody.authenticated,false);
 assert.equal(canaryBody.secret_echo,false);
 
-const controlResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/ak-control"),{});
-assert.equal(controlResponse.status,503);
-const controlBody=await controlResponse.json();
-assert.equal(controlBody.canary,"mutated-ak-control");
-assert.equal(controlBody.control_ak_mutated,false);
-assert.equal(controlBody.control_ak_not_found,false);
-assert.equal(controlBody.secret_echo,false);
+const crosscheckResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/credential-crosscheck"),{});
+assert.equal(crosscheckResponse.status,503);
+const crosscheckBody=await crosscheckResponse.json();
+assert.equal(crosscheckBody.canary,"cts-readonly-auth");
+assert.equal(crosscheckBody.service,"cts");
+assert.equal(crosscheckBody.authenticated,false);
+assert.equal(crosscheckBody.secret_echo,false);
+
+const oldControlResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/ak-control"),{});
+assert.equal(oldControlResponse,null);
 
 const fresh1=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/health?fresh=1"),{});
 assert.equal(fresh1.status,503);

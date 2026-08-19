@@ -1,13 +1,13 @@
-import {probeHuaweiAkExistenceControl} from "./huawei-functiongraph-diagnostic.js";
+import {probeHuaweiCredentialCrosscheck} from "./huawei-functiongraph-diagnostic.js";
 import {huaweiFunctionGraphMeta,huaweiJson,huaweiSignerSelftest,invokeHuaweiFunction,probeHuaweiFunctionGraph,probeHuaweiFunctionGraphAuth} from "./huawei-functiongraph.js";
 
 const HEALTH_TTL_MS=300000;
 const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
 const AUTH_CANARY_TTL_MS=300000;
-const AK_CONTROL_TTL_MS=300000;
+const CROSSCHECK_TTL_MS=300000;
 let healthCache={at:0,value:null};
 let authCanaryCache={at:0,value:null};
-let akControlCache={at:0,value:null};
+let crosscheckCache={at:0,value:null};
 
 function internalOnly(url){return url.hostname==="compute.internal"}
 function credentialShape(env){
@@ -33,12 +33,12 @@ async function authCanary(env){
   authCanaryCache={at:now,value};
   return{...value,cached_canary:false,cache_age_ms:0,cache_ttl_ms:AUTH_CANARY_TTL_MS};
 }
-async function akControl(env){
-  const now=Date.now(),age=akControlCache.value?Math.max(0,now-akControlCache.at):Infinity;
-  if(akControlCache.value&&age<AK_CONTROL_TTL_MS)return{...akControlCache.value,cached_control:true,cache_age_ms:age,cache_ttl_ms:AK_CONTROL_TTL_MS};
-  const value=await probeHuaweiAkExistenceControl(env);
-  akControlCache={at:now,value};
-  return{...value,cached_control:false,cache_age_ms:0,cache_ttl_ms:AK_CONTROL_TTL_MS};
+async function credentialCrosscheck(env){
+  const now=Date.now(),age=crosscheckCache.value?Math.max(0,now-crosscheckCache.at):Infinity;
+  if(crosscheckCache.value&&age<CROSSCHECK_TTL_MS)return{...crosscheckCache.value,cached_crosscheck:true,cache_age_ms:age,cache_ttl_ms:CROSSCHECK_TTL_MS};
+  const value=await probeHuaweiCredentialCrosscheck(env);
+  crosscheckCache={at:now,value};
+  return{...value,cached_crosscheck:false,cache_age_ms:0,cache_ttl_ms:CROSSCHECK_TTL_MS};
 }
 async function health(env,{force=false}={}){
   const now=Date.now();
@@ -60,9 +60,9 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
     const result=await authCanary(env);
     return huaweiJson(result,result.authenticated===true?200:503);
   }
-  if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/ak-control"){
-    const result=await akControl(env);
-    return huaweiJson(result,result.ok===true?200:503);
+  if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-crosscheck"){
+    const result=await credentialCrosscheck(env);
+    return huaweiJson(result,result.authenticated===true?200:503);
   }
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/health"){
     const result=await health(env,{force:url.searchParams.get("fresh")==="1"});
