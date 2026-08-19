@@ -3,6 +3,7 @@ import {maybeHandleBaiduCircleCI} from "./baidu-circleci-router.js";
 import {maybeHandleModels} from "./model-router.js";
 import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {maybeHandleOpenEOHandoff} from "./openeo-handoff-router.js";
+import {maybeHandleHuaweiFunctionGraph} from "./huawei-functiongraph-router.js";
 import {medicalImagingMeta} from "./medical-imaging-toolkit.js";
 import {chooseModalAccelerator,modalCpuSelftest,modalGpuSelftest,modalHealth,modalMeta} from "./modal.js";
 import {modalBoundedCompute} from "./modal-generic-compute.js";
@@ -34,7 +35,7 @@ async function normalizeMedicalImagingRequest(req){
   let body;try{body=await req.clone().json()}catch{return req}
   if(String(body?.profile||"")!=="medical-imaging")return req;
   const gpu=Boolean(body?.gpu);
-  body={...body,profile:gpu?"gpu":"core",input:{...(body?.input&&typeof body.input==="object"&&!Array.isArray(body.input)?body.input:{}),medical_imaging_toolkit:true,requested_profile:"medical-imaging"}};
+  body={...body,profile:gpu?"gpu":"core",input:{...(body?.input&&typeof body.input==="object"&&!Array.isArray(body?.input)?body.input:{}),medical_imaging_toolkit:true,requested_profile:"medical-imaging"}};
   const headers=new Headers(req.headers);headers.set("content-type","application/json");headers.delete("content-length");
   return new Request(req.url,{method:"POST",headers,body:JSON.stringify(body)});
 }
@@ -75,6 +76,8 @@ export default {
       const p=await modalGpuSelftest(env,n);
       return json(p,p.ok?200:503);
     }
+    const huaweiHandled=await maybeHandleHuaweiFunctionGraph(req,env);
+    if(huaweiHandled)return huaweiHandled;
     const openEOHandled=await maybeHandleOpenEOHandoff(req,env);
     if(openEOHandled)return openEOHandled;
     req=await normalizeMedicalImagingRequest(req);
