@@ -2,7 +2,7 @@ import { Sandbox } from "e2b";
 
 const DEFAULT_REGION="cn-beijing";
 const API_HOST_SUFFIX="e2b.fc.aliyuncs.com";
-const ACCEPTANCE_REVISION="2026-08-19-e2b-2.35.3";
+const ACCEPTANCE_REVISION="2026-08-19-e2b-2.35.3-fresh";
 const MANUAL_ACCEPTANCE_TOKEN_SHA256="5a143d0ffa53b125ff6a463eb7499f71de98d94efa9c1cce33a9ad006f3ef089";
 
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
