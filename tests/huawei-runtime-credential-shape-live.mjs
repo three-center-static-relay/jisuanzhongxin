@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+// Temporary Cloudflare build oracle. This script never prints secret values.
 const url="https://compute-worker.a15280020511.workers.dev/v1/providers/huawei-functiongraph/credential-shape";
 const response=await fetch(url,{headers:{"cache-control":"no-cache"}});
 assert.equal(response.status,200,"credential-shape endpoint must return HTTP 200");
