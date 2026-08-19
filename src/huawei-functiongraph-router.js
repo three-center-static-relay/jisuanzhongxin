@@ -6,6 +6,7 @@ const HEALTH_TTL_MS=300000;
 const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
 const AUTH_CANARY_TTL_MS=300000;
 const CROSSCHECK_TTL_MS=300000;
+const RESOLVER_VERSION="bounded-wildcard-v2";
 let healthCache={at:0,value:null};
 let authCanaryCache={at:0,value:null};
 let crosscheckCache={at:0,value:null};
@@ -18,6 +19,7 @@ function credentialShape(env){
     ok:Boolean(ak&&sk),
     provider:"huawei-functiongraph",
     diagnostic:"credential-shape",
+    resolver_version:RESOLVER_VERSION,
     ak_present:Boolean(ak),
     sk_present:Boolean(sk),
     ak_length:ak.length,
