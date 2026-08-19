@@ -1,12 +1,12 @@
 import {probeHuaweiCredentialCrosscheck,probeHuaweiDirectFunctionGraphAuthDetail} from "./huawei-functiongraph-diagnostic.js";
 import {huaweiFunctionGraphMeta,huaweiJson,huaweiSignerSelftest,invokeHuaweiFunction,probeHuaweiFunctionGraph} from "./huawei-functiongraph.js";
-import {probeHuaweiOfficialSdkFinal} from "./huawei-official-sdk-final-canary.js";
+import {probeHuaweiNodeHttpsEmpty} from "./huawei-node-https-empty-canary.js";
 
 const HEALTH_TTL_MS=300000;
 const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
 const AUTH_CANARY_TTL_MS=300000;
 const CROSSCHECK_TTL_MS=300000;
-const OFFICIAL_SDK_FINAL_AUDIT_PATH="/v1/providers/huawei-functiongraph/official-sdk-final-audit-a4f72c1d9e";
+const NODE_HTTPS_EMPTY_AUDIT_PATH="/v1/providers/huawei-functiongraph/node-https-empty-audit-f8316c2b49";
 let healthCache={at:0,value:null};
 let authCanaryCache={at:0,value:null};
 let crosscheckCache={at:0,value:null};
@@ -59,9 +59,9 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env),deployment_probe:"required-secrets-restored-v1",live_probe_scope:"service-binding-internal-only"});
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/signer-selftest")return huaweiJson(await huaweiSignerSelftest());
-  if(req.method==="GET"&&url.pathname===OFFICIAL_SDK_FINAL_AUDIT_PATH){
-    const result=await probeHuaweiOfficialSdkFinal(env);
-    return huaweiJson({...result,audit_scope:"one-shot-official-sdk-listfunctions"},result.authenticated===true?200:503);
+  if(req.method==="GET"&&url.pathname===NODE_HTTPS_EMPTY_AUDIT_PATH){
+    const result=await probeHuaweiNodeHttpsEmpty(env);
+    return huaweiJson({...result,audit_scope:"one-shot-node-https-official-listfunctions-shape"},result.authenticated===true?200:503);
   }
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/auth-canary"){
     if(!internalOnly(url))return denyExternalLiveDiagnostic();
