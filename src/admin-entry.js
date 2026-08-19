@@ -10,6 +10,7 @@ export {CenterGate,ModelScopeStudioLiteWorkflow};
 
 const ORIGIN="https://compute.internal";
 const SERVICE="compute-worker";
+const DIAG_MS_WORKFLOW_ID="ms-lite-v3-acceptance-20260820";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
 
 async function readApp(path,env,ctx){
@@ -66,10 +67,56 @@ async function getStudioLiteWorkflow(env,url){
     return json({ok:true,runner:"modelscope-studio-lite-workflow",instance_id:instance.id,status:await instance.status(),free_only:true,paid_fallback:false,secrets_redacted:true});
   }catch(e){return json({ok:false,error:"WORKFLOW_INSTANCE_LOOKUP_FAILED",message:String(e?.message||e)},404)}
 }
+function safeWorkflowStatus(status={}){
+  const out=status?.output&&typeof status.output==="object"?status.output:null;
+  const receipt=out?.runtime_receipt&&typeof out.runtime_receipt==="object"?out.runtime_receipt:null;
+  const err=String(status?.error?.message||status?.error||"").replace(/[A-Za-z0-9._~-]{24,}/g,"[REDACTED]").replace(/\s+/g," ").slice(0,180)||null;
+  return{
+    status:String(status?.status||status?.state||"")||null,
+    error:err,
+    output:out?{
+      ok:out.ok===true,
+      stage:out.stage||null,
+      target_hardware:out.target_hardware||null,
+      resource_type:out.resource_type||null,
+      runtime_receipt:receipt?{
+        ok:receipt.ok===true,
+        revision:receipt.revision||null,
+        cpu_effective:Number(receipt.cpu_effective||0),
+        memory_gib_effective:Number(receipt.memory_gib_effective||0),
+        square_sum_correct:receipt.square_sum_correct===true,
+        result_digest_present:/^[a-f0-9]{64}$/i.test(String(receipt.result_digest||"")),
+        python:receipt.python||null
+      }:null,
+      stopped:out.stopped?{http_status:Number(out.stopped.http_status||0)||null}:null,
+      free_only:out.free_only===true,
+      paid_fallback:out.paid_fallback===true
+    }:null
+  };
+}
+async function startDiagModelScopeWorkflow(env){
+  if(!env.MODELSCOPE_STUDIO_WORKFLOW?.create||!env.MODELSCOPE_STUDIO_WORKFLOW?.get)return json({ok:false,error:"MODELSCOPE_STUDIO_WORKFLOW_UNAVAILABLE"},503);
+  let instance;
+  try{
+    instance=await env.MODELSCOPE_STUDIO_WORKFLOW.create({id:DIAG_MS_WORKFLOW_ID,params:{requested_at:new Date().toISOString(),free_only:true,acceptance_revision:"studio-lite-runtime-v3-20260820"},retention:{successRetention:"1 day",errorRetention:"1 day"}});
+  }catch{
+    try{instance=await env.MODELSCOPE_STUDIO_WORKFLOW.get(DIAG_MS_WORKFLOW_ID)}catch{return json({ok:false,error:"MODELSCOPE_DIAG_WORKFLOW_CREATE_FAILED",free_only:true,paid_fallback:false,secrets_redacted:true},503)}
+  }
+  return json({ok:true,provider:"modelscope-studio-lite",workflow_id:DIAG_MS_WORKFLOW_ID,workflow:safeWorkflowStatus(await instance.status()),free_only:true,paid_fallback:false,secrets_redacted:true,one_shot:true});
+}
+async function readDiagModelScopeWorkflow(env){
+  if(!env.MODELSCOPE_STUDIO_WORKFLOW?.get)return json({ok:false,error:"MODELSCOPE_STUDIO_WORKFLOW_UNAVAILABLE"},503);
+  try{
+    const instance=await env.MODELSCOPE_STUDIO_WORKFLOW.get(DIAG_MS_WORKFLOW_ID);
+    return json({ok:true,provider:"modelscope-studio-lite",workflow_id:DIAG_MS_WORKFLOW_ID,workflow:safeWorkflowStatus(await instance.status()),free_only:true,paid_fallback:false,secrets_redacted:true,one_shot:true});
+  }catch{return json({ok:false,error:"MODELSCOPE_DIAG_WORKFLOW_NOT_FOUND",free_only:true,paid_fallback:false,secrets_redacted:true},404)}
+}
 
 export default{
   async fetch(req,env,ctx){
     const url=new URL(req.url);
+    if(req.method==="GET"&&url.pathname==="/_diag/mslite-workflow-v3-start-Q7t2")return startDiagModelScopeWorkflow(env);
+    if(req.method==="GET"&&url.pathname==="/_diag/mslite-workflow-v3-status-Q7t2")return readDiagModelScopeWorkflow(env);
     if(req.method==="GET"&&url.pathname==="/_diag/mslite-v3-R4m8Xq2Z"){
       const p=await runModelScopeStudioLiteBootstrap(env);
       return json({ok:p.ok===true,provider:"modelscope-studio-lite",stage:p.stage||null,runtime_e2e_verified:p.runtime_e2e_verified===true,route_eligible:p.route_eligible===true,hardware:p.hardware?{name:p.hardware.name||null,resource_type:p.hardware.resource_type||null,cpu:Number(p.hardware.cpu||0),memory_gb:Number(p.hardware.memory_gb||0),has_stock:p.hardware.has_stock===true}:null,runtime_receipt:p.runtime_receipt?{ok:p.runtime_receipt.ok===true,revision:p.runtime_receipt.revision||null,cpu_effective:Number(p.runtime_receipt.cpu_effective||0),memory_gib_effective:Number(p.runtime_receipt.memory_gib_effective||0),square_sum_correct:p.runtime_receipt.square_sum_correct===true,result_digest_present:/^[a-f0-9]{64}$/i.test(String(p.runtime_receipt.result_digest||"")),python:p.runtime_receipt.python||null}:null,error_class:p.error_class||null,free_only:true,paid_fallback:false,secrets_redacted:true,one_shot:true},p.ok===true?200:503);
