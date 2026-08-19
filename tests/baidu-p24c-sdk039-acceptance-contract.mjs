@@ -49,7 +49,7 @@ assert.doesNotMatch(admin,/production-entry-baidu-p24c-sdk039-e2e\.js/);
 assert.equal(fs.existsSync(wrapperUrl),false);
 assert.doesNotMatch(baidu,/candidate_sdk_acceptance/);
 assert.doesNotMatch(baidu,/SDK039_ACCEPTANCE_TASK/);
-assert.match(baidu,/const sdkVersion=operation==="SDK_SELFTEST"\?"0\.3\.9":"0\.3\.8"/);
+assert.match(baidu,/const requested=str\(sdk_version\);const sdkVersion=requested==="0\.3\.9"\|\|requested==="0\.3\.8"\?requested:\(operation==="SDK_SELFTEST"\?"0\.3\.9":"0\.3\.8"\)/);
 assert.match(baidu,/latest_failure_class:"BAIDU_COMPUTE_CREDIT_INSUFFICIENT"/);
 assert.match(baidu,/candidate_retest_policy:"blocked-until-free-coupon-credit-available-and-manual-acceptance"/);
 assert.match(bridge,/"--payment", "coupon"/);
