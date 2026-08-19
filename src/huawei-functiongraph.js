@@ -13,6 +13,15 @@ function canonicalUri(pathname){
   const value=String(pathname||"/").split("/").map(sdkEncode).join("/");
   return value.endsWith("/")?value:`${value}/`;
 }
+function canonicalQuery(target){
+  const keys=[...new Set(target.searchParams.keys())].sort();
+  const parts=[];
+  for(const key of keys){
+    const values=target.searchParams.getAll(key).sort();
+    for(const value of values)parts.push(`${sdkEncode(key)}=${sdkEncode(value)}`);
+  }
+  return parts.join("&");
+}
 function sdkDate(date=new Date()){
   return date.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z");
 }
@@ -37,7 +46,7 @@ export async function signHuaweiRequest({method="POST",url,headers={},body="",ak
   const signedHeaderNames=ordered.map(([key])=>key).join(";");
   const canonicalHeaderBlock=ordered.map(([key,value])=>`${key}:${value}\n`).join("");
   const payloadHash=await sha256Hex(body||"");
-  const request=[String(method).toUpperCase(),canonicalUri(target.pathname),target.searchParams.toString(),canonicalHeaderBlock,signedHeaderNames,payloadHash].join("\n");
+  const request=[String(method).toUpperCase(),canonicalUri(target.pathname),canonicalQuery(target),canonicalHeaderBlock,signedHeaderNames,payloadHash].join("\n");
   const requestHash=await sha256Hex(request);
   const stringToSign=["SDK-HMAC-SHA256",xSdkDate,requestHash].join("\n");
   const signature=await hmacSha256Hex(sk,stringToSign);
@@ -48,11 +57,15 @@ export async function huaweiSignerSelftest(){
   const project="0123456789abcdef0123456789abcdef";
   const urn=`urn:fss:cn-south-4:${project}:function:default:test1:latest`;
   const url=`https://functiongraph.cn-south-4.myhuaweicloud.com/v2/${project}/fgs/functions/${urn}/invocations`;
-  const signed=await signHuaweiRequest({method:"POST",url,headers:{"content-type":"application/json","x-cff-request-version":"v1","x-project-id":project},body:'{"selftest":"ok"}',ak:"AK_TEST",sk:"SK_TEST",date:new Date("2026-08-19T09:00:00.000Z")});
+  const date=new Date("2026-08-19T09:00:00.000Z");
+  const signed=await signHuaweiRequest({method:"POST",url,headers:{"content-type":"application/json","x-cff-request-version":"v1","x-project-id":project},body:'{"selftest":"ok"}',ak:"AK_TEST",sk:"SK_TEST",date});
   const expectedSignature="aa4fdf80a72d8f9617df86931251850c4034d7b88f2c94c512fe6c96908695b1";
   const actualSignature=String(signed.authorization||"").split("Signature=")[1]||"";
-  const ok=signed.x_sdk_date==="20260819T090000Z"&&signed.signed_headers==="content-type;host;x-cff-request-version;x-project-id;x-sdk-date"&&actualSignature===expectedSignature;
-  return{ok,selftest:"huawei-aksk-signer",algorithm:"SDK-HMAC-SHA256",canonical_vector:"functiongraph-post-v1-basiccredentials",expected_signature_match:actualSignature===expectedSignature,secret_echo:false};
+  const querySigned=await signHuaweiRequest({method:"GET",url:"https://iam.myhuaweicloud.com/v3/projects?z=hello%20world&a=2&a=1",headers:{"content-type":"application/json"},body:"",ak:"AK_TEST",sk:"SK_TEST",date});
+  const querySignature=String(querySigned.authorization||"").split("Signature=")[1]||"";
+  const canonicalQueryParity=querySignature==="213c015c1010d2a59dfd7b6880d35239bf297b408306283f689929f0410ee1ee";
+  const ok=signed.x_sdk_date==="20260819T090000Z"&&signed.signed_headers==="content-type;host;x-cff-request-version;x-project-id;x-sdk-date"&&actualSignature===expectedSignature&&canonicalQueryParity;
+  return{ok,selftest:"huawei-aksk-signer",algorithm:"SDK-HMAC-SHA256",canonical_vector:"functiongraph-post-v1-basiccredentials",expected_signature_match:actualSignature===expectedSignature,canonical_query_parity:canonicalQueryParity,secret_echo:false};
 }
 
 function configured(env){return Boolean(String(env.HUAWEI_CLOUD_AK||"").trim()&&String(env.HUAWEI_CLOUD_SK||"").trim()&&String(env.HUAWEI_FUNCTION_URN||"").trim())}
