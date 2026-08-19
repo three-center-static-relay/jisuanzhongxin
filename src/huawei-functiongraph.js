@@ -48,11 +48,11 @@ export async function huaweiSignerSelftest(){
   const project="0123456789abcdef0123456789abcdef";
   const urn=`urn:fss:cn-south-4:${project}:function:default:test1:latest`;
   const url=`https://functiongraph.cn-south-4.myhuaweicloud.com/v2/${project}/fgs/functions/${urn}/invocations`;
-  const signed=await signHuaweiRequest({method:"POST",url,headers:{"content-type":"application/json","x-cff-request-version":"v1","x-project-id":project},body:'{"selftest":"ok"}',ak:"AK_TEST",sk:"SK_TEST",date:new Date("2026-08-19T09:00:00.000Z")});
-  const expectedSignature="aa4fdf80a72d8f9617df86931251850c4034d7b88f2c94c512fe6c96908695b1";
+  const signed=await signHuaweiRequest({method:"POST",url,headers:{"content-type":"application/json","x-cff-request-version":"v1"},body:'{"selftest":"ok"}',ak:"AK_TEST",sk:"SK_TEST",date:new Date("2026-08-19T09:00:00.000Z")});
+  const expectedSignature="7b2748b6497aa801ebc9e19078d94777bd37d00143e141c7f09e5d0c6cbbd3f1";
   const actualSignature=String(signed.authorization||"").split("Signature=")[1]||"";
-  const ok=signed.x_sdk_date==="20260819T090000Z"&&signed.signed_headers==="content-type;host;x-cff-request-version;x-project-id;x-sdk-date"&&actualSignature===expectedSignature;
-  return{ok,selftest:"huawei-aksk-signer",algorithm:"SDK-HMAC-SHA256",canonical_vector:"functiongraph-post-v1",expected_signature_match:actualSignature===expectedSignature,secret_echo:false};
+  const ok=signed.x_sdk_date==="20260819T090000Z"&&signed.signed_headers==="content-type;host;x-cff-request-version;x-sdk-date"&&actualSignature===expectedSignature;
+  return{ok,selftest:"huawei-aksk-signer",algorithm:"SDK-HMAC-SHA256",canonical_vector:"functiongraph-post-v1-sdk-headers",expected_signature_match:actualSignature===expectedSignature,secret_echo:false};
 }
 
 function configured(env){return Boolean(String(env.HUAWEI_CLOUD_AK||"").trim()&&String(env.HUAWEI_CLOUD_SK||"").trim()&&String(env.HUAWEI_FUNCTION_URN||"").trim())}
@@ -99,7 +99,7 @@ export async function probeHuaweiFunctionGraphAuth(env){
   if(!ak||!sk||!parsed.ok)return{ok:false,configured:false,provider:"huawei-functiongraph",canary:"list-functions-auth",http_status:0,authenticated:false,authorized:false,error_class:!parsed.ok?"INVALID_HUAWEI_FUNCTION_URN":"HUAWEI_AK_SK_NOT_CONFIGURED",route_eligible:false,paid_fallback:false,secret_echo:false};
   const endpoint=`https://functiongraph.${parsed.region}.myhuaweicloud.com`;
   const url=`${endpoint}/v2/${parsed.project_id}/fgs/functions?maxitems=1`;
-  const baseHeaders={"content-type":"application/json","x-project-id":parsed.project_id};
+  const baseHeaders={"content-type":"application/json"};
   try{
     const signed=await signHuaweiRequest({method:"GET",url,headers:baseHeaders,body:"",ak,sk});
     const response=await fetch(url,{method:"GET",headers:{...baseHeaders,"x-sdk-date":signed.x_sdk_date,authorization:signed.authorization}});
@@ -124,7 +124,7 @@ export async function invokeHuaweiFunction(env,payload,{returnLog=false}={}){
   const path=`/v2/${parsed.project_id}/fgs/functions/${parsed.urn}/invocations`;
   const url=`${endpoint}${path}`;
   const body=JSON.stringify(payload&&typeof payload==="object"?payload:{});
-  const baseHeaders={"content-type":"application/json","x-cff-request-version":"v1","x-project-id":parsed.project_id,...(returnLog?{"x-cff-log-type":"tail"}:{})};
+  const baseHeaders={"content-type":"application/json","x-cff-request-version":"v1",...(returnLog?{"x-cff-log-type":"tail"}:{})};
   try{
     const signed=await signHuaweiRequest({method:"POST",url,headers:baseHeaders,body,ak,sk});
     const response=await fetch(url,{method:"POST",headers:{...baseHeaders,"x-sdk-date":signed.x_sdk_date,authorization:signed.authorization},body});
