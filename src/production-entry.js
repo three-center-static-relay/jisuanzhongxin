@@ -1,6 +1,7 @@
 import production,{CenterGate} from "./production.js";
 import {maybeHandleBaiduCircleCI} from "./baidu-circleci-router.js";
 import {maybeHandleBaiduManualAcceptance} from "./baidu-manual-acceptance.js";
+import {maybeHandleBaiduLLM} from "./baidu-llm.js";
 import {maybeHandleModels} from "./model-router.js";
 import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {maybeHandleOpenEOHandoff} from "./openeo-handoff-router.js";
@@ -78,6 +79,8 @@ export default {
       const p=await modalGpuSelftest(env,n);
       return json(p,p.ok?200:503);
     }
+    const baiduLLMHandled=await maybeHandleBaiduLLM(req,env);
+    if(baiduLLMHandled)return baiduLLMHandled;
     const huaweiHandled=await maybeHandleHuaweiFunctionGraph(req,env);
     if(huaweiHandled)return huaweiHandled;
     const aliyunHandled=await maybeHandleAliyunFCSandbox(req,env);
