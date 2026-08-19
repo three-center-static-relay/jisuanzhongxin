@@ -72,10 +72,6 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
     const result=await health(env,{force:url.searchParams.get("fresh")==="1"});
     return huaweiJson(result,result.ok===true?200:503);
   }
-  if(req.method==="GET"&&url.pathname==="/_diag/LlOAac3lO4nADZWUJfgsqK"){
-    const result=await authCanary(env);
-    return huaweiJson({...result,one_shot:true,secret_echo:false},result.authenticated===true?200:503);
-  }
   if(req.method==="POST"&&url.pathname==="/v1/providers/huawei-functiongraph/compute"){
     if(!internalOnly(url))return huaweiJson({ok:false,error:"POLICY_DENIED",message:"Huawei FunctionGraph execution is service-binding internal only",route_eligible:false,secret_echo:false},403);
     let body={};try{body=await req.json()}catch{return huaweiJson({ok:false,error:"INVALID_JSON",route_eligible:false,secret_echo:false},400)}
