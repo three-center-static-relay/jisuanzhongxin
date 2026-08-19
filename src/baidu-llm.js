@@ -16,7 +16,12 @@ async function timedFetch(url,init={},timeoutMs=TIMEOUT_MS){
 function headers(env){const t=token(env);return{authorization:`Bearer ${t}`,accept:"application/json","content-type":"application/json","user-agent":"three-center-compute/2026-08"}}
 function contentOf(body){return String(body?.choices?.[0]?.message?.content||"").trim()}
 function usageOf(body){const u=body?.usage||{};return{prompt_tokens:Number(u.prompt_tokens||0),completion_tokens:Number(u.completion_tokens||0),total_tokens:Number(u.total_tokens||0)}}
-function safeError(body,status){const raw=String(body?.error?.code||body?.error_code||body?.code||"").slice(0,80);return raw||`BAIDU_LLM_HTTP_${status}`}
+function safeError(body,status){
+  const code=String(body?.error?.code||body?.error_code||body?.code||"").slice(0,80);
+  if(code)return code;
+  const msg=String(body?.error?.message||body?.error_msg||body?.message||"").replace(/[A-Za-z0-9_-]{24,}/g,"[REDACTED]").slice(0,160);
+  return msg||`BAIDU_LLM_HTTP_${status}`;
+}
 
 export function baiduLLMMeta(env={}){return{
   provider:"baidu-aistudio-llm",
