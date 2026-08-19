@@ -70,10 +70,6 @@ async function getStudioLiteWorkflow(env,url){
 export default{
   async fetch(req,env,ctx){
     const url=new URL(req.url);
-    if(req.method==="GET"&&url.pathname==="/_diag/mslite-Z7nK4mQ2pV9x"){
-      const p=await runModelScopeStudioLiteBootstrap(env);
-      return json({ok:p.ok===true,provider:"modelscope-studio-lite",stage:p.stage||null,runtime_e2e_verified:p.runtime_e2e_verified===true,route_eligible:p.route_eligible===true,hardware:p.hardware?{name:p.hardware.name||null,resource_type:p.hardware.resource_type||null,cpu:Number(p.hardware.cpu||0),memory_gb:Number(p.hardware.memory_gb||0),has_stock:p.hardware.has_stock===true}:null,runtime_receipt:p.runtime_receipt?{ok:p.runtime_receipt.ok===true,revision:p.runtime_receipt.revision||null,cpu_effective:Number(p.runtime_receipt.cpu_effective||0),memory_gib_effective:Number(p.runtime_receipt.memory_gib_effective||0),square_sum_correct:p.runtime_receipt.square_sum_correct===true,result_digest_present:/^[a-f0-9]{64}$/i.test(String(p.runtime_receipt.result_digest||"")),python:p.runtime_receipt.python||null}:null,error_class:p.error_class||null,free_only:true,paid_fallback:false,secrets_redacted:true,one_shot:true},p.ok===true?200:503);
-    }
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-runtime")return modelScopeRuntimeSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-inference")return modelScopeInferenceSelftest(env);
     if(req.method==="GET"&&url.pathname==="/v1/selftest/modelscope-studio")return modelScopeStudioSelftest(env);
