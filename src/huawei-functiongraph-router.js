@@ -1,10 +1,11 @@
-import {probeHuaweiCredentialCrosscheck} from "./huawei-functiongraph-diagnostic.js";
+import {probeHuaweiCredentialCrosscheck,probeHuaweiDummyAuthTransport} from "./huawei-functiongraph-diagnostic.js";
 import {huaweiFunctionGraphMeta,huaweiJson,huaweiSignerSelftest,invokeHuaweiFunction,probeHuaweiFunctionGraph,probeHuaweiFunctionGraphAuth} from "./huawei-functiongraph.js";
 
 const HEALTH_TTL_MS=300000;
 const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
 const AUTH_CANARY_TTL_MS=300000;
 const CROSSCHECK_TTL_MS=300000;
+const DUMMY_TRANSPORT_AUDIT_PATH="/v1/providers/huawei-functiongraph/dummy-auth-transport-audit-7a41f0c2";
 let healthCache={at:0,value:null};
 let authCanaryCache={at:0,value:null};
 let crosscheckCache={at:0,value:null};
@@ -57,6 +58,7 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env)});
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/signer-selftest")return huaweiJson(await huaweiSignerSelftest());
+  if(req.method==="GET"&&url.pathname===DUMMY_TRANSPORT_AUDIT_PATH)return huaweiJson(await probeHuaweiDummyAuthTransport(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/auth-canary"){
     if(!internalOnly(url))return denyExternalLiveDiagnostic();
     const result=await authCanary(env);
