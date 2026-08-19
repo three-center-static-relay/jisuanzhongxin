@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {webcrypto} from "node:crypto";
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 
-const {classifyHuaweiError,huaweiFunctionGraphMeta,parseHuaweiFunctionUrn,signHuaweiRequest}=await import("../src/huawei-functiongraph.js");
+const {classifyHuaweiError,huaweiFunctionGraphMeta,huaweiSignerSelftest,parseHuaweiFunctionUrn,signHuaweiRequest}=await import("../src/huawei-functiongraph.js");
 const {maybeHandleHuaweiFunctionGraph}=await import("../src/huawei-functiongraph-router.js");
 
 const project="0123456789abcdef0123456789abcdef";
@@ -36,6 +36,10 @@ assert.equal(signed.x_sdk_date,"20260819T090000Z");
 assert.equal(signed.signed_headers,"content-type;host;x-cff-request-version;x-project-id;x-sdk-date");
 assert.match(signed.authorization,/^SDK-HMAC-SHA256 Access=AK_TEST, SignedHeaders=content-type;host;x-cff-request-version;x-project-id;x-sdk-date, Signature=[0-9a-f]{64}$/);
 assert.equal(signed.authorization.includes("SK_TEST"),false);
+const signerSelftest=await huaweiSignerSelftest();
+assert.equal(signerSelftest.ok,true);
+assert.equal(signerSelftest.expected_signature_match,true);
+assert.equal(signerSelftest.secret_echo,false);
 
 assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: verify aksk signature fail"),"HUAWEI_AKSK_SIGNATURE_FAILED");
 assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: Get secretKey failed,ak:REDACTED,err:ak not exist"),"HUAWEI_AK_NOT_FOUND");
@@ -65,6 +69,13 @@ assert.equal(shape.secret_echo,false);
 const shapeSerialized=JSON.stringify(shape);
 assert.equal(shapeSerialized.includes("A".repeat(20)),false);
 assert.equal(shapeSerialized.includes("S".repeat(40)),false);
+
+const signerResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/signer-selftest"),{});
+assert.equal(signerResponse.status,200);
+const signerBody=await signerResponse.json();
+assert.equal(signerBody.ok,true);
+assert.equal(signerBody.expected_signature_match,true);
+assert.equal(signerBody.secret_echo,false);
 
 const canaryResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/auth-canary"),{});
 assert.equal(canaryResponse.status,503);
