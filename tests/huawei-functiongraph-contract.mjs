@@ -19,18 +19,27 @@ assert.equal(meta.configured,true);
 assert.equal(meta.trigger_required,false);
 assert.equal(meta.apig_required,false);
 assert.equal(meta.auth,"ak-sk-signed");
-assert.equal(meta.route_eligible,false);
+assert.equal(meta.lifecycle,"production-scoped");
+assert.equal(meta.runtime_e2e_attested,true);
+assert.equal(meta.production_acceptance,"2026-08-20-live-echo-e2e-pass");
+assert.equal(meta.route_eligible,true);
+assert.equal(meta.route_scope,"configured-function-explicit-internal");
+assert.equal(meta.explicit_selection_only,true);
+assert.equal(meta.automatic_global_routing,false);
+assert.equal(meta.free_tier_available,true);
+assert.equal(meta.free_tier_quota_machine_readable,false);
 assert.equal(meta.paid_fallback,false);
 assert.equal(meta.secret_echo,false);
+
+const unconfigured=huaweiFunctionGraphMeta({});
+assert.equal(unconfigured.route_eligible,false);
+assert.equal(unconfigured.lifecycle,"unconfigured");
 
 const signed=await signHuaweiRequest({
   method:"POST",
   url:`https://functiongraph.cn-south-4.myhuaweicloud.com/v2/${project}/fgs/functions/${urn}/invocations`,
   headers:{"content-type":"application/json","x-cff-request-version":"v1","x-project-id":project},
-  body:'{"selftest":"ok"}',
-  ak:"AK_TEST",
-  sk:"SK_TEST",
-  date:new Date("2026-08-19T09:00:00.000Z")
+  body:'{"selftest":"ok"}',ak:"AK_TEST",sk:"SK_TEST",date:new Date("2026-08-19T09:00:00.000Z")
 });
 assert.equal(signed.x_sdk_date,"20260819T090000Z");
 assert.equal(signed.signed_headers,"content-type;host;x-cff-request-version;x-project-id;x-sdk-date");
@@ -54,6 +63,7 @@ assert.equal(metaResponse.status,200);
 const metaBody=await metaResponse.json();
 assert.equal(metaBody.provider,"huawei-functiongraph");
 assert.equal(metaBody.configured,false);
+assert.equal(metaBody.route_eligible,false);
 assert.equal(metaBody.secret_echo,false);
 
 const shapeEnv={HUAWEI_CLOUD_AK:"A".repeat(20),HUAWEI_CLOUD_SK:"S".repeat(40)};
