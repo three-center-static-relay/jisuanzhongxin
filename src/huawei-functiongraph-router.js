@@ -10,6 +10,7 @@ let authCanaryCache={at:0,value:null};
 let crosscheckCache={at:0,value:null};
 
 function internalOnly(url){return url.hostname==="compute.internal"}
+function denyExternalLiveDiagnostic(){return huaweiJson({ok:false,error:"POLICY_DENIED",message:"Huawei live diagnostics are service-binding internal only",route_eligible:false,paid_fallback:false,secret_echo:false},403)}
 function credentialShape(env){
   const ak=String(env.HUAWEI_CLOUD_AK||"").trim();
   const sk=String(env.HUAWEI_CLOUD_SK||"").trim();
@@ -57,14 +58,17 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/signer-selftest")return huaweiJson(await huaweiSignerSelftest());
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/auth-canary"){
+    if(!internalOnly(url))return denyExternalLiveDiagnostic();
     const result=await authCanary(env);
     return huaweiJson(result,result.authenticated===true?200:503);
   }
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-crosscheck"){
+    if(!internalOnly(url))return denyExternalLiveDiagnostic();
     const result=await credentialCrosscheck(env);
     return huaweiJson(result,result.authenticated===true?200:503);
   }
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/health"){
+    if(!internalOnly(url))return denyExternalLiveDiagnostic();
     const result=await health(env,{force:url.searchParams.get("fresh")==="1"});
     return huaweiJson(result,result.ok===true?200:503);
   }
