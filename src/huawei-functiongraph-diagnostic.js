@@ -34,7 +34,7 @@ export async function probeHuaweiCredentialCrosscheck(env={}){
     }
 
     const url=`https://cts.${parsed.region}.myhuaweicloud.com/v3/${parsed.project_id}/trackers`;
-    const baseHeaders={"content-type":"application/json"};
+    const baseHeaders={"content-type":"application/json","x-project-id":parsed.project_id};
     const signed=await signHuaweiRequest({method:"GET",url,headers:baseHeaders,body:"",ak,sk});
     const response=await fetch(url,{method:"GET",headers:{...baseHeaders,"x-sdk-date":signed.x_sdk_date,authorization:signed.authorization}});
     const body=parseJson(await response.text());
