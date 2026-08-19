@@ -3,7 +3,7 @@ import {classifyHuaweiError,parseHuaweiFunctionUrn,signHuaweiRequest} from "./hu
 function safeError(value){return String(value?.message||value||"HUAWEI_CREDENTIAL_CROSSCHECK_FAILED").slice(0,180)}
 function parseJson(value){try{return JSON.parse(String(value||"{}"))}catch{return{}}}
 function upstreamCode(body){return String(body?.error_code||body?.code||"").slice(0,80)||null}
-function upstreamMessage(body){return body?.error_msg||body?.error_message||body?.message||body?.error?.message||""}
+function upstreamMessage(body){return body?.error_msg||body?.error_message||body?.errorMessage||body?.message||body?.error?.message||""}
 function iamRejected(response,code){return response.status===401||code==="APIGW.0301"||code==="APIG.0301"}
 function safeAuthDetailClass(message){
   const msg=String(message||"").toLowerCase();
@@ -26,6 +26,25 @@ async function probeIamProjectContext({ak,sk,parsed}){
   const projects=Array.isArray(body?.projects)?body.projects:[];
   const projectContextMatch=iamAuthenticated&&projects.some(project=>String(project?.id||"")===parsed.project_id);
   return{response,body,code,iam_authenticated:iamAuthenticated,project_context_match:projectContextMatch,region_project_found:iamAuthenticated&&projects.length>0,region_project_count:iamAuthenticated?projects.length:0};
+}
+
+export async function probeHuaweiDirectFunctionGraphAuthDetail(env={}){
+  const parsed=parseHuaweiFunctionUrn(env.HUAWEI_FUNCTION_URN);
+  const ak=String(env.HUAWEI_CLOUD_AK||"").trim();
+  const sk=String(env.HUAWEI_CLOUD_SK||"").trim();
+  if(!ak||!sk||!parsed.ok)return{ok:false,configured:false,provider:"huawei-functiongraph",canary:"list-functions-auth-detail",http_status:0,authenticated:false,authorized:false,error_class:!parsed.ok?"INVALID_HUAWEI_FUNCTION_URN":"HUAWEI_AK_SK_NOT_CONFIGURED",auth_detail_class:"PREFLIGHT_FAILED",route_eligible:false,paid_fallback:false,secret_echo:false};
+  const url=`https://functiongraph.${parsed.region}.myhuaweicloud.com/v2/${parsed.project_id}/fgs/functions?maxitems=1`;
+  const baseHeaders={"content-type":"application/json","x-project-id":parsed.project_id};
+  try{
+    const signed=await signHuaweiRequest({method:"GET",url,headers:baseHeaders,body:"",ak,sk});
+    const response=await fetch(url,{method:"GET",headers:{...baseHeaders,"x-sdk-date":signed.x_sdk_date,authorization:signed.authorization}});
+    const receivedAt=Date.now();
+    const upstreamDateMs=Date.parse(String(response.headers.get("date")||""));
+    const body=parseJson(await response.text());
+    const code=upstreamCode(body),message=upstreamMessage(body);
+    const rejected=iamRejected(response,code);
+    return{ok:!rejected,configured:true,provider:"huawei-functiongraph",canary:"list-functions-auth-detail",http_status:response.status,authenticated:!rejected,authorized:response.ok,upstream_error_code:code,error_class:response.ok?null:classifyHuaweiError(code,message),auth_detail_class:response.ok?"AUTHENTICATED":safeAuthDetailClass(message),upstream_date_present:Number.isFinite(upstreamDateMs),clock_within_15m:Number.isFinite(upstreamDateMs)?Math.abs(receivedAt-upstreamDateMs)<=900000:null,region:parsed.region,route_eligible:false,paid_fallback:false,secret_echo:false};
+  }catch(error){return{ok:false,configured:true,provider:"huawei-functiongraph",canary:"list-functions-auth-detail",http_status:0,authenticated:false,authorized:false,upstream_error_code:null,error_class:"HUAWEI_TRANSPORT_OR_SIGNING_RUNTIME_ERROR",auth_detail_class:"TRANSPORT_ERROR",error:safeError(error),region:parsed.region,route_eligible:false,paid_fallback:false,secret_echo:false}}
 }
 
 export async function probeHuaweiCredentialCrosscheck(env={}){
