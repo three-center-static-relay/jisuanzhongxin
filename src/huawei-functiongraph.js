@@ -44,6 +44,17 @@ export async function signHuaweiRequest({method="POST",url,headers={},body="",ak
   return{authorization:`SDK-HMAC-SHA256 Access=${ak}, SignedHeaders=${signedHeaderNames}, Signature=${signature}`,x_sdk_date:xSdkDate,signed_headers:signedHeaderNames};
 }
 
+export async function huaweiSignerSelftest(){
+  const project="0123456789abcdef0123456789abcdef";
+  const urn=`urn:fss:cn-south-4:${project}:function:default:test1:latest`;
+  const url=`https://functiongraph.cn-south-4.myhuaweicloud.com/v2/${project}/fgs/functions/${urn}/invocations`;
+  const signed=await signHuaweiRequest({method:"POST",url,headers:{"content-type":"application/json","x-cff-request-version":"v1","x-project-id":project},body:'{"selftest":"ok"}',ak:"AK_TEST",sk:"SK_TEST",date:new Date("2026-08-19T09:00:00.000Z")});
+  const expectedSignature="aa4fdf80a72d8f9617df86931251850c4034d7b88f2c94c512fe6c96908695b1";
+  const actualSignature=String(signed.authorization||"").split("Signature=")[1]||"";
+  const ok=signed.x_sdk_date==="20260819T090000Z"&&signed.signed_headers==="content-type;host;x-cff-request-version;x-project-id;x-sdk-date"&&actualSignature===expectedSignature;
+  return{ok,selftest:"huawei-aksk-signer",algorithm:"SDK-HMAC-SHA256",canonical_vector:"functiongraph-post-v1",expected_signature_match:actualSignature===expectedSignature,secret_echo:false};
+}
+
 function configured(env){return Boolean(String(env.HUAWEI_CLOUD_AK||"").trim()&&String(env.HUAWEI_CLOUD_SK||"").trim()&&String(env.HUAWEI_FUNCTION_URN||"").trim())}
 function safeError(value){return String(value?.message||value||"HUAWEI_FUNCTIONGRAPH_REQUEST_FAILED").slice(0,180)}
 function parseJson(value){if(value&&typeof value==="object")return value;try{return JSON.parse(String(value||""))}catch{return null}}
@@ -92,13 +103,17 @@ export async function probeHuaweiFunctionGraphAuth(env){
   try{
     const signed=await signHuaweiRequest({method:"GET",url,headers:baseHeaders,body:"",ak,sk});
     const response=await fetch(url,{method:"GET",headers:{...baseHeaders,"x-sdk-date":signed.x_sdk_date,authorization:signed.authorization}});
+    const responseReceivedAt=Date.now();
+    const upstreamDateMs=Date.parse(String(response.headers.get("date")||""));
+    const clockSkewMs=Number.isFinite(upstreamDateMs)?Math.abs(responseReceivedAt-upstreamDateMs):null;
+    const clockWithin15m=clockSkewMs===null?null:clockSkewMs<=900000;
     const text=await response.text();
     const responseBody=parseJson(text)||{};
     const upstreamErrorCode=String(responseBody?.error_code||"").slice(0,80)||null;
     const errorClass=response.ok?null:classifyHuaweiError(upstreamErrorCode,responseBody?.error_msg);
     const authenticated=response.status!==401;
-    return{ok:authenticated,configured:true,provider:"huawei-functiongraph",canary:"list-functions-auth",http_status:response.status,authenticated,authorized:response.ok,region:parsed.region,upstream_error_code:upstreamErrorCode,error_class:errorClass,error:authenticated?null:errorClass,route_eligible:false,paid_fallback:false,secret_echo:false};
-  }catch(error){return{ok:false,configured:true,provider:"huawei-functiongraph",canary:"list-functions-auth",http_status:0,authenticated:false,authorized:false,region:parsed.region,upstream_error_code:null,error_class:"HUAWEI_TRANSPORT_OR_SIGNING_RUNTIME_ERROR",error:safeError(error),route_eligible:false,paid_fallback:false,secret_echo:false}}
+    return{ok:authenticated,configured:true,provider:"huawei-functiongraph",canary:"list-functions-auth",http_status:response.status,authenticated,authorized:response.ok,region:parsed.region,upstream_error_code:upstreamErrorCode,error_class:errorClass,error:authenticated?null:errorClass,upstream_date_present:Number.isFinite(upstreamDateMs),clock_skew_ms:clockSkewMs,clock_within_15m:clockWithin15m,route_eligible:false,paid_fallback:false,secret_echo:false};
+  }catch(error){return{ok:false,configured:true,provider:"huawei-functiongraph",canary:"list-functions-auth",http_status:0,authenticated:false,authorized:false,region:parsed.region,upstream_error_code:null,error_class:"HUAWEI_TRANSPORT_OR_SIGNING_RUNTIME_ERROR",error:safeError(error),upstream_date_present:false,clock_skew_ms:null,clock_within_15m:null,route_eligible:false,paid_fallback:false,secret_echo:false}}
 }
 
 export async function invokeHuaweiFunction(env,payload,{returnLog=false}={}){
