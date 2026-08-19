@@ -1,21 +1,40 @@
 const ALNUM=/^[A-Za-z0-9]+$/;
 
-function read(env,key){
-  try{return String(env?.[key]??"").trim()}catch{return""}
+function read(source,key){
+  try{return String(source?.[key]??"").trim()}catch{return""}
 }
 
-function keys(env){
-  try{return Reflect.ownKeys(env||{}).filter(key=>typeof key==="string")}catch{return[]}
+function ownKeys(source){
+  try{return Reflect.ownKeys(source||{}).filter(key=>typeof key==="string")}catch{return[]}
 }
 
-function resolveOne(env,{canonical,pattern,length}){
-  const exact=read(env,canonical);
+function runtimeProcessEnv(){
+  try{return typeof process!=="undefined"&&process?.env?process.env:{}}catch{return{}}
+}
+
+function collectSources(env,runtimeEnv){
+  const values=new Map();
+  for(const source of [env,runtimeEnv]){
+    for(const key of ownKeys(source)){
+      if(values.has(key))continue;
+      const value=read(source,key);
+      if(value)values.set(key,value);
+    }
+  }
+  return values;
+}
+
+function exactValue(env,runtimeEnv,key){
+  return read(env,key)||read(runtimeEnv,key);
+}
+
+function resolveOne(env,runtimeEnv,{canonical,pattern,length}){
+  const exact=exactValue(env,runtimeEnv,canonical);
   if(exact)return{value:exact,mode:"canonical",ambiguous:false};
 
   const matches=[];
-  for(const key of keys(env)){
+  for(const [key,value] of collectSources(env,runtimeEnv)){
     if(key===canonical||!pattern.test(key))continue;
-    const value=read(env,key);
     if(value.length===length&&ALNUM.test(value))matches.push({key,value});
   }
 
@@ -23,9 +42,9 @@ function resolveOne(env,{canonical,pattern,length}){
   return{value:"",mode:"none",ambiguous:matches.length>1};
 }
 
-export function resolveHuaweiCredentialBindings(env={}){
-  const ak=resolveOne(env,{canonical:"HUAWEI_CLOUD_AK",pattern:/^[HI]UAWEI_CLOUD_A[A-Z0-9_]{0,12}$/i,length:20});
-  const sk=resolveOne(env,{canonical:"HUAWEI_CLOUD_SK",pattern:/^[HI]UAWEI_CLOUD_S[A-Z0-9_]{0,12}$/i,length:40});
+export function resolveHuaweiCredentialBindings(env={},runtimeEnv=runtimeProcessEnv()){
+  const ak=resolveOne(env,runtimeEnv,{canonical:"HUAWEI_CLOUD_AK",pattern:/^[HI]UAWEI_CLOUD_A[A-Z0-9_]{0,12}$/i,length:20});
+  const sk=resolveOne(env,runtimeEnv,{canonical:"HUAWEI_CLOUD_SK",pattern:/^[HI]UAWEI_CLOUD_S[A-Z0-9_]{0,12}$/i,length:40});
   return{
     ak:ak.value,
     sk:sk.value,
