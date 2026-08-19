@@ -1,12 +1,10 @@
 import {probeHuaweiCredentialCrosscheck} from "./huawei-functiongraph-diagnostic.js";
 import {huaweiFunctionGraphMeta,huaweiJson,huaweiSignerSelftest,invokeHuaweiFunction,probeHuaweiFunctionGraph,probeHuaweiFunctionGraphAuth} from "./huawei-functiongraph.js";
-import {normalizeHuaweiEnv} from "./huawei-env.js";
 
 const HEALTH_TTL_MS=300000;
 const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
 const AUTH_CANARY_TTL_MS=300000;
 const CROSSCHECK_TTL_MS=300000;
-const RESOLVER_VERSION="bounded-wildcard-v2";
 let healthCache={at:0,value:null};
 let authCanaryCache={at:0,value:null};
 let crosscheckCache={at:0,value:null};
@@ -19,7 +17,6 @@ function credentialShape(env){
     ok:Boolean(ak&&sk),
     provider:"huawei-functiongraph",
     diagnostic:"credential-shape",
-    resolver_version:RESOLVER_VERSION,
     ak_present:Boolean(ak),
     sk_present:Boolean(sk),
     ak_length:ak.length,
@@ -55,7 +52,6 @@ async function health(env,{force=false}={}){
 }
 
 export async function maybeHandleHuaweiFunctionGraph(req,env){
-  env=normalizeHuaweiEnv(env);
   const url=new URL(req.url);
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env)});
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
