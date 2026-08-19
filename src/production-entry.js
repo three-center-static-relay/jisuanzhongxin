@@ -7,6 +7,7 @@ import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {maybeHandleOpenEOHandoff} from "./openeo-handoff-router.js";
 import {maybeHandleHuaweiFunctionGraph} from "./huawei-functiongraph-router.js";
 import {maybeHandleAliyunFCSandbox} from "./aliyun-fc-sandbox.js";
+import {maybeHandleModelScopeStudioLiteDiagnostic} from "./modelscope-studio-lite-diagnostic.js";
 import {medicalImagingMeta} from "./medical-imaging-toolkit.js";
 import {chooseModalAccelerator,modalCpuSelftest,modalGpuSelftest,modalHealth,modalMeta} from "./modal.js";
 import {modalBoundedCompute} from "./modal-generic-compute.js";
@@ -79,6 +80,8 @@ export default {
       const p=await modalGpuSelftest(env,n);
       return json(p,p.ok?200:503);
     }
+    const msLiteDiagHandled=await maybeHandleModelScopeStudioLiteDiagnostic(req,env);
+    if(msLiteDiagHandled)return msLiteDiagHandled;
     const baiduLLMHandled=await maybeHandleBaiduLLM(req,env);
     if(baiduLLMHandled)return baiduLLMHandled;
     const huaweiHandled=await maybeHandleHuaweiFunctionGraph(req,env);
