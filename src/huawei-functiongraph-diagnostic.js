@@ -33,6 +33,7 @@ export async function probeHuaweiIamIdentity(env={}){
 
 export async function probeHuaweiCredentialCrosscheck(env={}){
   const identity=await probeHuaweiIamIdentity(env);
+  if(!identity.configured)return{...identity,ok:false,provider:"huawei-credential-crosscheck",service:"cts",canary:"cts-readonly-auth",stage:"preflight",iam_authenticated:false,cts_attempted:false};
   if(!identity.authenticated)return{...identity,ok:false,provider:"huawei-credential-crosscheck",canary:"iam-first-credential-crosscheck",stage:"iam-identity",iam_authenticated:false,cts_attempted:false};
   if(identity.project_context_match===false)return{ok:false,configured:true,provider:"huawei-credential-crosscheck",service:"iam",canary:"iam-first-credential-crosscheck",stage:"project-context",http_status:identity.http_status,authenticated:false,authorized:false,iam_authenticated:true,resolved_project_present:true,project_context_match:false,cts_attempted:false,error_class:"HUAWEI_PROJECT_CONTEXT_MISMATCH",region:identity.region,route_eligible:false,paid_fallback:false,secret_echo:false};
   if(identity.project_context_match!==true)return{ok:false,configured:true,provider:"huawei-credential-crosscheck",service:"iam",canary:"iam-first-credential-crosscheck",stage:"project-context",http_status:identity.http_status,authenticated:false,authorized:false,iam_authenticated:true,resolved_project_present:false,project_context_match:null,cts_attempted:false,error_class:"HUAWEI_PROJECT_CONTEXT_UNRESOLVED",region:identity.region,route_eligible:false,paid_fallback:false,secret_echo:false};
