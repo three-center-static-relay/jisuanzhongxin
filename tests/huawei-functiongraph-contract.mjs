@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {webcrypto} from "node:crypto";
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 
-const {huaweiFunctionGraphMeta,parseHuaweiFunctionUrn,signHuaweiRequest}=await import("../src/huawei-functiongraph.js");
+const {classifyHuaweiError,huaweiFunctionGraphMeta,parseHuaweiFunctionUrn,signHuaweiRequest}=await import("../src/huawei-functiongraph.js");
 const {maybeHandleHuaweiFunctionGraph}=await import("../src/huawei-functiongraph-router.js");
 
 const project="0123456789abcdef0123456789abcdef";
@@ -36,6 +36,11 @@ assert.equal(signed.x_sdk_date,"20260819T090000Z");
 assert.equal(signed.signed_headers,"content-type;host;x-cff-request-version;x-project-id;x-sdk-date");
 assert.match(signed.authorization,/^SDK-HMAC-SHA256 Access=AK_TEST, SignedHeaders=content-type;host;x-cff-request-version;x-project-id;x-sdk-date, Signature=[0-9a-f]{64}$/);
 assert.equal(signed.authorization.includes("SK_TEST"),false);
+
+assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: verify aksk signature fail"),"HUAWEI_AKSK_SIGNATURE_FAILED");
+assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: Get secretKey failed,ak:REDACTED,err:ak not exist"),"HUAWEI_AK_NOT_FOUND");
+assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: AK access failed to reach the limit, forbidden"),"HUAWEI_AK_TEMP_LOCKED_OR_RESTRICTED");
+assert.equal(classifyHuaweiError("APIGW.0301","unknown auth detail"),"HUAWEI_IAM_AUTH_FAILED");
 
 const metaResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/meta"),{});
 assert.equal(metaResponse.status,200);
