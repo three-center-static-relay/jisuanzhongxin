@@ -5,6 +5,22 @@ const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
 let healthCache={at:0,value:null};
 
 function internalOnly(url){return url.hostname==="compute.internal"}
+function credentialShape(env){
+  const ak=String(env.HUAWEI_CLOUD_AK||"").trim();
+  const sk=String(env.HUAWEI_CLOUD_SK||"").trim();
+  return{
+    ok:Boolean(ak&&sk),
+    provider:"huawei-functiongraph",
+    diagnostic:"credential-shape",
+    ak_present:Boolean(ak),
+    sk_present:Boolean(sk),
+    ak_length:ak.length,
+    sk_length:sk.length,
+    ak_alnum:/^[A-Za-z0-9]+$/.test(ak),
+    sk_alnum:/^[A-Za-z0-9]+$/.test(sk),
+    secret_echo:false
+  };
+}
 async function health(env,{force=false}={}){
   const now=Date.now();
   const age=healthCache.value?Math.max(0,now-healthCache.at):Infinity;
@@ -19,6 +35,7 @@ async function health(env,{force=false}={}){
 export async function maybeHandleHuaweiFunctionGraph(req,env){
   const url=new URL(req.url);
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env)});
+  if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/health"){
     const result=await health(env,{force:url.searchParams.get("fresh")==="1"});
     return huaweiJson(result,result.ok===true?200:503);
