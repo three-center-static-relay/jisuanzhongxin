@@ -10,7 +10,9 @@
     "test:capability-manifest": "node tests/capability-manifest-contract.mjs"
   },
   "dependencies": {
-    "e2b": "2.35.3"
+    "e2b": "2.35.3",
+    "@huaweicloud/huaweicloud-sdk-core": "3.1.201",
+    "@huaweicloud/huaweicloud-sdk-functiongraph": "3.1.201"
   },
   "devDependencies": {
     "wrangler": "^4.0.0",

@@ -1,5 +1,6 @@
 import {probeHuaweiCredentialCrosscheck,probeHuaweiDirectFunctionGraphAuthDetail} from "./huawei-functiongraph-diagnostic.js";
 import {huaweiFunctionGraphMeta,huaweiJson,huaweiSignerSelftest,invokeHuaweiFunction,probeHuaweiFunctionGraph} from "./huawei-functiongraph.js";
+import {probeHuaweiOfficialSdkAuth} from "./huawei-official-sdk-canary.js";
 
 const HEALTH_TTL_MS=300000;
 const HEALTH_FORCE_MIN_INTERVAL_MS=300000;
@@ -7,6 +8,7 @@ const AUTH_CANARY_TTL_MS=300000;
 const CROSSCHECK_TTL_MS=300000;
 const AUTH_CIRCUIT_BASE="/auth-circuit/huawei-functiongraph";
 const AUTH_CIRCUIT_VERSION="global-do-v1";
+const OFFICIAL_SDK_AUDIT_PATH="/v1/providers/huawei-functiongraph/official-sdk-audit-51c27e8b";
 let healthCache={at:0,value:null};
 let authCanaryCache={at:0,value:null};
 let crosscheckCache={at:0,value:null};
@@ -88,6 +90,10 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env),auth_circuit:AUTH_CIRCUIT_VERSION,auth_probe_cooldown_ms:300000,live_probe_scope:"service-binding-internal-only"});
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/signer-selftest")return huaweiJson(await huaweiSignerSelftest());
+  if(req.method==="GET"&&url.pathname===OFFICIAL_SDK_AUDIT_PATH){
+    const result=await withAuthCircuit(env,()=>probeHuaweiOfficialSdkAuth(env));
+    return huaweiJson({...result,audit_scope:"one-shot-official-sdk-listfunctions"},result.authenticated===true?200:503);
+  }
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/auth-canary"){
     if(!internalOnly(url))return denyExternalLiveDiagnostic();
     const result=await authCanary(env);
