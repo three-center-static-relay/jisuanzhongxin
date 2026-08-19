@@ -5,7 +5,7 @@ const aliyun=fs.readFileSync(new URL("../src/aliyun-fc-sandbox.js",import.meta.u
 const baidu=fs.readFileSync(new URL("../src/baidu-manual-acceptance.js",import.meta.url),"utf8");
 const entry=fs.readFileSync(new URL("../src/production-entry.js",import.meta.url),"utf8");
 
-if(pkg.dependencies?.e2b!=="2.31.0")throw new Error("E2B_SDK_MUST_BE_PINNED_2_31_0");
+if(pkg.dependencies?.e2b!=="2.35.3")throw new Error("E2B_SDK_MUST_BE_PINNED_2_35_3");
 for(const token of ["code-interpreter-v1","timeoutMs:60000","sandbox.kill()","route_eligible:false","production_routing:false","x-three-center-acceptance-token","MANUAL_ACCEPTANCE_TOKEN_SHA256"]){if(!aliyun.includes(token))throw new Error(`ALIYUN_ACCEPTANCE_MISSING_${token}`)}
 for(const token of ["payment:\"coupon\"","acoin_allowed:false","paid_fallback:false","sdk_version:\"0.3.9\"","x-three-center-acceptance-token","MANUAL_ACCEPTANCE_TOKEN_SHA256"]){if(!baidu.includes(token))throw new Error(`BAIDU_ACCEPTANCE_MISSING_${token}`)}
 if(!entry.includes("maybeHandleBaiduManualAcceptance"))throw new Error("BAIDU_MANUAL_ACCEPTANCE_NOT_WIRED");
