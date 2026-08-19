@@ -20,5 +20,5 @@ console.log("HUAWEI_HEALTH_SAFE",JSON.stringify(safe));
 assert.equal(safe.fresh_probe_requested,true);
 assert.equal(safe.refresh_suppressed,false);
 assert.equal(safe.secret_echo,false);
-assert.equal(safe.error_class,"HUAWEI_AK_TEMP_LOCKED_OR_RESTRICTED","oracle-temp-lock=false");
-console.log("PASS huawei-health-oracle-temp-lock");
+assert.equal(safe.error_class,"HUAWEI_IAM_AUTH_FAILED","oracle-generic-iam=false");
+console.log("PASS huawei-health-oracle-generic-iam");
