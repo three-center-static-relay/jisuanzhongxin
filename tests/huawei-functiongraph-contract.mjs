@@ -40,6 +40,9 @@ assert.equal(signed.authorization.includes("SK_TEST"),false);
 assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: verify aksk signature fail"),"HUAWEI_AKSK_SIGNATURE_FAILED");
 assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: Get secretKey failed,ak:REDACTED,err:ak not exist"),"HUAWEI_AK_NOT_FOUND");
 assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: AK access failed to reach the limit, forbidden"),"HUAWEI_AK_TEMP_LOCKED_OR_RESTRICTED");
+assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: x-auth-token not found"),"HUAWEI_X_AUTH_TOKEN_MISSING");
+assert.equal(classifyHuaweiError("APIGW.0301","Incorrect IAM authentication information: token expires"),"HUAWEI_TOKEN_EXPIRED");
+assert.equal(classifyHuaweiError("APIGW.0302","not authorized"),"HUAWEI_IAM_NOT_AUTHORIZED");
 assert.equal(classifyHuaweiError("APIGW.0301","unknown auth detail"),"HUAWEI_IAM_AUTH_FAILED");
 
 const metaResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/meta"),{});
@@ -62,6 +65,13 @@ assert.equal(shape.secret_echo,false);
 const shapeSerialized=JSON.stringify(shape);
 assert.equal(shapeSerialized.includes("A".repeat(20)),false);
 assert.equal(shapeSerialized.includes("S".repeat(40)),false);
+
+const canaryResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/auth-canary"),{});
+assert.equal(canaryResponse.status,503);
+const canaryBody=await canaryResponse.json();
+assert.equal(canaryBody.canary,"list-functions-auth");
+assert.equal(canaryBody.authenticated,false);
+assert.equal(canaryBody.secret_echo,false);
 
 const fresh1=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/health?fresh=1"),{});
 assert.equal(fresh1.status,503);
