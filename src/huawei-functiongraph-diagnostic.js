@@ -28,22 +28,6 @@ async function probeIamProjectContext({ak,sk,parsed}){
   return{response,body,code,iam_authenticated:iamAuthenticated,project_context_match:projectContextMatch,region_project_found:iamAuthenticated&&projects.length>0,region_project_count:iamAuthenticated?projects.length:0};
 }
 
-export async function probeHuaweiDummyAuthTransport(env={}){
-  const parsed=parseHuaweiFunctionUrn(env.HUAWEI_FUNCTION_URN);
-  const region=parsed.ok?parsed.region:"cn-south-4";
-  const dummyAk="00000000000000000000";
-  const dummySk="0000000000000000000000000000000000000000";
-  const url=`https://iam.myhuaweicloud.com/v3/projects?name=${encodeURIComponent(region)}`;
-  const baseHeaders={"content-type":"application/json"};
-  try{
-    const signed=await signHuaweiRequest({method:"GET",url,headers:baseHeaders,body:"",ak:dummyAk,sk:dummySk});
-    const response=await fetch(url,{method:"GET",headers:{...baseHeaders,"x-sdk-date":signed.x_sdk_date,authorization:signed.authorization}});
-    const body=parseJson(await response.text());
-    const code=upstreamCode(body),message=upstreamMessage(body),detail=safeAuthDetailClass(message);
-    return{ok:true,provider:"huawei-dummy-auth-transport",service:"iam",http_status:response.status,upstream_error_code:code,error_class:classifyHuaweiError(code,message),auth_detail_class:detail,authorization_header_recognized:detail!=="X_AUTH_TOKEN_MISSING",used_real_credentials:false,route_eligible:false,paid_fallback:false,secret_echo:false};
-  }catch(error){return{ok:false,provider:"huawei-dummy-auth-transport",service:"iam",http_status:0,upstream_error_code:null,error_class:"HUAWEI_TRANSPORT_OR_SIGNING_RUNTIME_ERROR",auth_detail_class:"TRANSPORT_ERROR",authorization_header_recognized:null,used_real_credentials:false,route_eligible:false,paid_fallback:false,secret_echo:false,error:safeError(error)}}
-}
-
 export async function probeHuaweiCredentialCrosscheck(env={}){
   const parsed=parseHuaweiFunctionUrn(env.HUAWEI_FUNCTION_URN);
   const ak=String(env.HUAWEI_CLOUD_AK||"").trim();
@@ -55,7 +39,7 @@ export async function probeHuaweiCredentialCrosscheck(env={}){
       return{ok:true,configured:true,provider:"huawei-credential-crosscheck",service:"iam",canary:"cts-readonly-auth",phase:"iam-project-discovery",http_status:iam.response.status,authenticated:false,iam_authenticated:false,project_context_match:false,region_project_found:false,region_project_count:0,authorized:false,upstream_error_code:iam.code,error_class:classifyHuaweiError(iam.code,upstreamMessage(iam.body)),auth_detail_class:safeAuthDetailClass(upstreamMessage(iam.body)),region:parsed.region,route_eligible:false,paid_fallback:false,secret_echo:false};
     }
     if(!iam.project_context_match){
-      return{ok:true,configured:true,provider:"huawei-credential-crosscheck",service:"iam",canary:"cts-readonly-auth",phase:"project-context-compare",http_status:iam.response.status,authenticated:false,iam_authenticated:true,project_context_match:false,region_project_found:iam.region_project_found,region_project_count:iam.region_project_count,authorized:false,upstream_error_code:null,error_class:"HUAWEI_PROJECT_CONTEXT_MISMATCH",auth_detail_class:"AUTHENTICATED",region:parsed.region,route_eligible:false,paid_fallback:false,secret_echo:false};
+      return{ok:true,configured:true,provider:"huawei-credential-crosscheck",service:"iam",canary:"cts-readonly-auth",phase:"project-context-compare",http_status:iam.response.status,authenticated:false,iam_authenticated:true,project_context_match:false,region_project_found:iam.region_project_found,region_project_count:iam.region_project_count,authorized:false,upstream_error_code:null,error_class:"HUAWEI_PROJECT_CONTEXT_MISMATCH",auth_detail_class:"AUTHENTICATED",region:parsed.region,route_eligible:false,p aid_fallback:false,secret_echo:false};
     }
 
     const url=`https://cts.${parsed.region}.myhuaweicloud.com/v3/${parsed.project_id}/trackers`;
