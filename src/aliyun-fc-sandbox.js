@@ -91,6 +91,10 @@ export async function maybeHandleAliyunFCSandbox(req,env){
   if(req.method==="GET"&&u.pathname==="/v1/providers/aliyun-fc-sandbox/health"){
     const p=await probeAliyunFCSandbox(env);return json(p,p.ok?200:503);
   }
+  if(req.method==="GET"&&u.pathname==="/_diag/aliyun-runtime-N6q2Vb8K"){
+    const p=await runBoundedRuntimeAcceptance(env);
+    return json({ok:p.ok===true,provider:"aliyun-fc-sandbox",runtime_e2e_verified:p.runtime_e2e_verified===true,shell_ok:p.shell_ok===true,python_ok:p.python_ok===true,file_write_read_ok:p.file_write_read_ok===true,template:p.template||null,max_lifetime_seconds:Number(p.max_lifetime_seconds||60),elapsed_ms:Number(p.elapsed_ms||0),error_class:p.error_class||null,paid_fallback:false,production_routing:false,route_eligible:false,secrets_redacted:true,one_shot:true},p.ok===true?200:503);
+  }
   if(req.method==="POST"&&u.pathname==="/v1/selftest/aliyun-fc-sandbox-runtime"){
     if(!await manualAcceptanceAuthorized(req))return json({ok:false,error:"UNAUTHORIZED",secrets_redacted:true},401);
     const p=await runBoundedRuntimeAcceptance(env);return json(p,p.ok?200:503);
