@@ -2,17 +2,17 @@ import {WorkflowEntrypoint} from "cloudflare:workers";
 import {prepareModelScopeStudioLite,deployModelScopeStudioLite,getModelScopeStudioLiteStatus,stopModelScopeStudioLite} from "./modelscope-studio-lite.js";
 
 const TARGET="platform/2v-cpu-16g-mem";
-const REVISION="studio-lite-runtime-v2-20260817";
+const REVISION="studio-lite-runtime-v3-20260820";
 const ONE_ATTEMPT={retries:{limit:1,delay:"1 second"},timeout:"2 minutes"};
 const STATUS_ATTEMPT={retries:{limit:1,delay:"1 second"},timeout:"45 seconds"};
 const STOP_RETRY={retries:{limit:2,delay:"5 seconds",backoff:"linear"},timeout:"1 minute"};
 const err=(stage,r)=>new Error(`${stage}:${r?.error_class||r?.stage||"FAILED"}`);
-const verifiedV2=s=>s?.runtime_e2e_verified===true&&s?.hardware?.name===TARGET&&s?.hardware?.resource_type==="free"&&s?.runtime_receipt?.revision===REVISION;
+const verifiedV3=s=>s?.runtime_e2e_verified===true&&s?.hardware?.name===TARGET&&s?.hardware?.resource_type==="free"&&s?.runtime_receipt?.revision===REVISION;
 
 export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
   async run(event,step){
     const prior=await step.do("check prior verified Studio receipt",STATUS_ATTEMPT,async()=>getModelScopeStudioLiteStatus(this.env));
-    if(verifiedV2(prior)){
+    if(verifiedV3(prior)){
       const stopped=await step.do("ensure previously verified Studio is stopped",STOP_RETRY,async()=>{
         const s=await stopModelScopeStudioLite(this.env);
         if(s?.ok!==true)throw err("stop-prior",s);
@@ -65,7 +65,7 @@ export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
       for(let i=0;i<5;i++){
         await step.sleep(`wait for Studio runtime ${i+1}`,"20 seconds");
         const s=await step.do(`inspect Studio receipt ${i+1}`,STATUS_ATTEMPT,async()=>getModelScopeStudioLiteStatus(this.env));
-        if(verifiedV2(s)){
+        if(verifiedV3(s)){
           verified=s;
           break;
         }

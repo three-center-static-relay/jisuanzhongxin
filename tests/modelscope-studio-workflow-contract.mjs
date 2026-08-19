@@ -10,7 +10,7 @@ for(const literal of [
   "WorkflowEntrypoint",
   "ModelScopeStudioLiteWorkflow",
   'platform/2v-cpu-16g-mem',
-  'studio-lite-runtime-v2-20260817',
+  'studio-lite-runtime-v3-20260820',
   'check prior verified Studio receipt',
   'stage:"already-verified"',
   'step.sleep',
@@ -45,5 +45,6 @@ assert.ok(!workflow.includes('retries:{limit:5'),"Workflow must not inherit high
 assert.ok(workflow.includes('const ONE_ATTEMPT={retries:{limit:1'),"Prepare/deploy attempts must stay single-attempt");
 assert.ok(workflow.includes('const STATUS_ATTEMPT={retries:{limit:1'),"Status reads must stay single-attempt");
 assert.ok(workflow.includes('const STOP_RETRY={retries:{limit:2'),"Stop may retry once but must remain bounded");
+assert.ok(!workflow.includes('studio-lite-runtime-v2-20260817'),"Obsolete v2 receipt contract must not remain");
 
-console.log(JSON.stringify({ok:true,suite:"modelscope-studio-workflow-contract",workflow:"modelscope-studio-lite-runner",binding:"MODELSCOPE_STUDIO_WORKFLOW",demand_driven:true,public_trigger:false,idempotent_acceptance_guard:true,poll_rounds:5,poll_sleep_seconds:20,subrequest_budget_max:50,explicit_stop:true,rollback_stop:true,free_only:true,paid_fallback:false}));
+console.log(JSON.stringify({ok:true,suite:"modelscope-studio-workflow-contract",workflow:"modelscope-studio-lite-runner",binding:"MODELSCOPE_STUDIO_WORKFLOW",receipt_revision:"studio-lite-runtime-v3-20260820",demand_driven:true,public_trigger:false,idempotent_acceptance_guard:true,poll_rounds:5,poll_sleep_seconds:20,subrequest_budget_max:50,explicit_stop:true,rollback_stop:true,free_only:true,paid_fallback:false}));
