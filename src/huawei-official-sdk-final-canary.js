@@ -2,7 +2,7 @@ import * as core from "@huaweicloud/huaweicloud-sdk-core";
 import * as functiongraph from "@huaweicloud/huaweicloud-sdk-functiongraph/v2/public-api";
 import {parseHuaweiFunctionUrn} from "./huawei-functiongraph.js";
 
-const SDK_VERSION="3.1.210";
+const SDK_VERSION="3.1.209";
 function detailClass(message){
   const msg=String(message||"").toLowerCase();
   if(msg.includes("x-auth-token"))return"X_AUTH_TOKEN_MISSING";
