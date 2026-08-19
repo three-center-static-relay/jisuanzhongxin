@@ -86,7 +86,7 @@ assert.equal(externalCrosscheckBody.secret_echo,false);
 const canaryResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://compute.internal/v1/providers/huawei-functiongraph/auth-canary"),{});
 assert.equal(canaryResponse.status,503);
 const canaryBody=await canaryResponse.json();
-assert.equal(canaryBody.canary,"list-functions-auth");
+assert.equal(canaryBody.canary,"list-functions-auth-detail");
 assert.equal(canaryBody.authenticated,false);
 assert.equal(canaryBody.secret_echo,false);
 
