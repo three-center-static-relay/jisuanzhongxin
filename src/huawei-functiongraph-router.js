@@ -6,6 +6,7 @@ const HEALTH_FORCE_MIN_INTERVAL_MS=300000;
 const AUTH_CANARY_TTL_MS=300000;
 const CROSSCHECK_TTL_MS=300000;
 const AUTH_CIRCUIT_BASE="/auth-circuit/huawei-functiongraph";
+const AUTH_CIRCUIT_VERSION="global-do-v1";
 let healthCache={at:0,value:null};
 let authCanaryCache={at:0,value:null};
 let crosscheckCache={at:0,value:null};
@@ -84,7 +85,7 @@ async function health(env,{force=false}={}){
 
 export async function maybeHandleHuaweiFunctionGraph(req,env){
   const url=new URL(req.url);
-  if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env)});
+  if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env),auth_circuit:AUTH_CIRCUIT_VERSION,auth_probe_cooldown_ms:300000,live_probe_scope:"service-binding-internal-only"});
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/signer-selftest")return huaweiJson(await huaweiSignerSelftest());
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/auth-canary"){
