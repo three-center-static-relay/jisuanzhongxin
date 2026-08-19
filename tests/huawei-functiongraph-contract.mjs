@@ -77,14 +77,20 @@ assert.equal(signerBody.ok,true);
 assert.equal(signerBody.expected_signature_match,true);
 assert.equal(signerBody.secret_echo,false);
 
-const canaryResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/auth-canary"),{});
+const externalCrosscheck=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/credential-crosscheck"),{});
+assert.equal(externalCrosscheck.status,403);
+const externalCrosscheckBody=await externalCrosscheck.json();
+assert.equal(externalCrosscheckBody.error,"POLICY_DENIED");
+assert.equal(externalCrosscheckBody.secret_echo,false);
+
+const canaryResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://compute.internal/v1/providers/huawei-functiongraph/auth-canary"),{});
 assert.equal(canaryResponse.status,503);
 const canaryBody=await canaryResponse.json();
 assert.equal(canaryBody.canary,"list-functions-auth");
 assert.equal(canaryBody.authenticated,false);
 assert.equal(canaryBody.secret_echo,false);
 
-const crosscheckResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/credential-crosscheck"),{});
+const crosscheckResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://compute.internal/v1/providers/huawei-functiongraph/credential-crosscheck"),{});
 assert.equal(crosscheckResponse.status,503);
 const crosscheckBody=await crosscheckResponse.json();
 assert.equal(crosscheckBody.canary,"cts-readonly-auth");
@@ -95,14 +101,14 @@ assert.equal(crosscheckBody.secret_echo,false);
 const oldControlResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/ak-control"),{});
 assert.equal(oldControlResponse,null);
 
-const fresh1=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/health?fresh=1"),{});
+const fresh1=await maybeHandleHuaweiFunctionGraph(new Request("https://compute.internal/v1/providers/huawei-functiongraph/health?fresh=1"),{});
 assert.equal(fresh1.status,503);
 const freshBody1=await fresh1.json();
 assert.equal(freshBody1.cached_health,false);
 assert.equal(freshBody1.fresh_probe_requested,true);
 assert.equal(freshBody1.refresh_suppressed,false);
 
-const fresh2=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/health?fresh=1"),{});
+const fresh2=await maybeHandleHuaweiFunctionGraph(new Request("https://compute.internal/v1/providers/huawei-functiongraph/health?fresh=1"),{});
 assert.equal(fresh2.status,503);
 const freshBody2=await fresh2.json();
 assert.equal(freshBody2.cached_health,true);
