@@ -10,7 +10,7 @@
     "test:capability-manifest": "node tests/capability-manifest-contract.mjs"
   },
   "dependencies": {
-    "e2b": "2.31.0"
+    "e2b": "2.35.3"
   },
   "devDependencies": {
     "wrangler": "^4.0.0",
