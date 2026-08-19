@@ -1,8 +1,10 @@
-import {huaweiFunctionGraphMeta,huaweiJson,invokeHuaweiFunction,probeHuaweiFunctionGraph} from "./huawei-functiongraph.js";
+import {huaweiFunctionGraphMeta,huaweiJson,invokeHuaweiFunction,probeHuaweiFunctionGraph,probeHuaweiFunctionGraphAuth} from "./huawei-functiongraph.js";
 
 const HEALTH_TTL_MS=300000;
 const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
+const AUTH_CANARY_TTL_MS=300000;
 let healthCache={at:0,value:null};
+let authCanaryCache={at:0,value:null};
 
 function internalOnly(url){return url.hostname==="compute.internal"}
 function credentialShape(env){
@@ -21,6 +23,13 @@ function credentialShape(env){
     secret_echo:false
   };
 }
+async function authCanary(env){
+  const now=Date.now(),age=authCanaryCache.value?Math.max(0,now-authCanaryCache.at):Infinity;
+  if(authCanaryCache.value&&age<AUTH_CANARY_TTL_MS)return{...authCanaryCache.value,cached_canary:true,cache_age_ms:age,cache_ttl_ms:AUTH_CANARY_TTL_MS};
+  const value=await probeHuaweiFunctionGraphAuth(env);
+  authCanaryCache={at:now,value};
+  return{...value,cached_canary:false,cache_age_ms:0,cache_ttl_ms:AUTH_CANARY_TTL_MS};
+}
 async function health(env,{force=false}={}){
   const now=Date.now();
   const age=healthCache.value?Math.max(0,now-healthCache.at):Infinity;
@@ -36,6 +45,10 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
   const url=new URL(req.url);
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env)});
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
+  if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/auth-canary"){
+    const result=await authCanary(env);
+    return huaweiJson(result,result.authenticated===true?200:503);
+  }
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/health"){
     const result=await health(env,{force:url.searchParams.get("fresh")==="1"});
     return huaweiJson(result,result.ok===true?200:503);
