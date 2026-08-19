@@ -47,6 +47,18 @@ export async function signHuaweiRequest({method="POST",url,headers={},body="",ak
 function configured(env){return Boolean(String(env.HUAWEI_CLOUD_AK||"").trim()&&String(env.HUAWEI_CLOUD_SK||"").trim()&&String(env.HUAWEI_FUNCTION_URN||"").trim())}
 function safeError(value){return String(value?.message||value||"HUAWEI_FUNCTIONGRAPH_REQUEST_FAILED").slice(0,180)}
 function parseJson(value){if(value&&typeof value==="object")return value;try{return JSON.parse(String(value||""))}catch{return null}}
+export function classifyHuaweiError(errorCode,errorMsg){
+  const code=String(errorCode||"").trim();
+  const msg=String(errorMsg||"").toLowerCase();
+  if(code==="APIGW.0301"||code==="APIG.0301"){
+    if(msg.includes("verify aksk signature fail"))return"HUAWEI_AKSK_SIGNATURE_FAILED";
+    if(msg.includes("get secretkey failed")||msg.includes("ak not exist"))return"HUAWEI_AK_NOT_FOUND";
+    if(msg.includes("reach the limit")||msg.includes("forbidden"))return"HUAWEI_AK_TEMP_LOCKED_OR_RESTRICTED";
+    if(msg.includes("decrypt token fail"))return"HUAWEI_TOKEN_DECRYPT_FAILED";
+    return"HUAWEI_IAM_AUTH_FAILED";
+  }
+  return code?"HUAWEI_UPSTREAM_ERROR":"HUAWEI_FUNCTION_INVOCATION_FAILED";
+}
 
 export function huaweiFunctionGraphMeta(env={}){
   const parsed=parseHuaweiFunctionUrn(env.HUAWEI_FUNCTION_URN);
@@ -84,8 +96,10 @@ export async function invokeHuaweiFunction(env,payload,{returnLog=false}={}){
     const invokeStatus=Number(responseBody?.status||0)||null;
     const functionResult=parseJson(responseBody?.result);
     const ok=response.ok&&invokeStatus===200;
-    return{ok,configured:true,provider:"huawei-functiongraph",http_status:response.status,invoke_status:invokeStatus,request_id:String(responseBody?.request_id||response.headers.get("x-cff-request-id")||"")||null,result:functionResult??responseBody?.result??null,log_returned:returnLog&&Boolean(responseBody?.log),region:parsed.region,function_name:parsed.function_name,route_eligible:false,paid_fallback:false,secret_echo:false,error:ok?null:String(responseBody?.error_code||responseBody?.error_msg||"HUAWEI_FUNCTION_INVOCATION_FAILED").slice(0,180)};
-  }catch(error){return{ok:false,configured:true,provider:"huawei-functiongraph",http_status:0,invoke_status:null,request_id:null,result:null,region:parsed.region,function_name:parsed.function_name,route_eligible:false,paid_fallback:false,secret_echo:false,error:safeError(error)}}
+    const upstreamErrorCode=String(responseBody?.error_code||"").slice(0,80)||null;
+    const errorClass=ok?null:classifyHuaweiError(upstreamErrorCode,responseBody?.error_msg);
+    return{ok,configured:true,provider:"huawei-functiongraph",http_status:response.status,invoke_status:invokeStatus,request_id:String(responseBody?.request_id||response.headers.get("x-cff-request-id")||"")||null,result:functionResult??responseBody?.result??null,log_returned:returnLog&&Boolean(responseBody?.log),region:parsed.region,function_name:parsed.function_name,route_eligible:false,paid_fallback:false,secret_echo:false,upstream_error_code:upstreamErrorCode,error_class:errorClass,error:ok?null:errorClass};
+  }catch(error){return{ok:false,configured:true,provider:"huawei-functiongraph",http_status:0,invoke_status:null,request_id:null,result:null,region:parsed.region,function_name:parsed.function_name,route_eligible:false,paid_fallback:false,secret_echo:false,upstream_error_code:null,error_class:"HUAWEI_TRANSPORT_OR_SIGNING_RUNTIME_ERROR",error:safeError(error)}}
 }
 
 export async function probeHuaweiFunctionGraph(env){
