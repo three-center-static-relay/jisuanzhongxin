@@ -16,11 +16,23 @@ async function timedFetch(url,init={},timeoutMs=TIMEOUT_MS){
 function headers(env){const t=token(env);return{authorization:`Bearer ${t}`,accept:"application/json","content-type":"application/json","user-agent":"three-center-compute/2026-08"}}
 function contentOf(body){return String(body?.choices?.[0]?.message?.content||"").trim()}
 function usageOf(body){const u=body?.usage||{};return{prompt_tokens:Number(u.prompt_tokens||0),completion_tokens:Number(u.completion_tokens||0),total_tokens:Number(u.total_tokens||0)}}
-function safeError(body,status){
+function sanitizeRaw(raw){
+  return String(raw||"")
+    .replace(/<[^>]*>/g," ")
+    .replace(/(?:bearer\s+)?[A-Za-z0-9._~-]{24,}/gi,"[REDACTED]")
+    .replace(/\s+/g," ")
+    .trim()
+    .slice(0,160);
+}
+function safeError(body,status,raw=""){
   const code=String(body?.error?.code||body?.error_code||body?.code||"").slice(0,80);
   if(code)return code;
-  const msg=String(body?.error?.message||body?.error_msg||body?.message||"").replace(/[A-Za-z0-9_-]{24,}/g,"[REDACTED]").slice(0,160);
-  return msg||`BAIDU_LLM_HTTP_${status}`;
+  const msg=String(body?.error?.message||body?.error_msg||body?.message||"").replace(/[A-Za-z0-9._~-]{24,}/g,"[REDACTED]").slice(0,160);
+  return msg||sanitizeRaw(raw)||`BAIDU_LLM_HTTP_${status}`;
+}
+async function parseResponse(r){
+  const raw=await r.text();let body={};try{body=raw?JSON.parse(raw):{}}catch{}
+  return{raw,body};
 }
 
 export function baiduLLMMeta(env={}){return{
@@ -48,8 +60,8 @@ export async function baiduLLMCanary(env={}){
   const payload={model:DEFAULT_MODEL,messages:[{role:"user",content:"Reply with exactly: 42"}],temperature:0.01,max_completion_tokens:8,stream:false};
   try{
     const r=await timedFetch(`${BASE}/chat/completions`,{method:"POST",headers:headers(env),body:JSON.stringify(payload)});
-    const body=await r.json().catch(()=>({})),text=contentOf(body),usage=usageOf(body),correct=/^42[.!。！]?$/.test(text);
-    return{ok:r.ok&&correct,provider:"baidu-aistudio-llm",configured:true,authenticated:r.status!==401&&r.status!==403,inference_ok:r.ok,correct,http_status:r.status,model:DEFAULT_MODEL,usage,content_chars:text.length,error_class:r.ok?(correct?null:"BAIDU_LLM_CANARY_OUTPUT_MISMATCH"):safeError(body,r.status),explicit_selection_only:true,automatic_global_routing:false,paid_fallback:false,secret_echo:false};
+    const {raw,body}=await parseResponse(r),text=contentOf(body),usage=usageOf(body),correct=/^42[.!。！]?$/.test(text);
+    return{ok:r.ok&&correct,provider:"baidu-aistudio-llm",configured:true,authenticated:r.status!==401&&r.status!==403,inference_ok:r.ok,correct,http_status:r.status,model:DEFAULT_MODEL,usage,content_chars:text.length,error_class:r.ok?(correct?null:"BAIDU_LLM_CANARY_OUTPUT_MISMATCH"):safeError(body,r.status,raw),explicit_selection_only:true,automatic_global_routing:false,paid_fallback:false,secret_echo:false};
   }catch(e){return{ok:false,provider:"baidu-aistudio-llm",configured:true,authenticated:false,inference_ok:false,http_status:Number(e?.status||0)||null,model:DEFAULT_MODEL,error_class:String(e?.message||"BAIDU_LLM_CANARY_FAILED").slice(0,120),explicit_selection_only:true,automatic_global_routing:false,paid_fallback:false,secret_echo:false}}
 }
 
@@ -73,8 +85,8 @@ async function invoke(req,env){
   const temperature=Number.isFinite(rawTemperature)?Math.max(0.01,Math.min(1,rawTemperature)):0.2;
   const payload={model,messages:clean,temperature,max_completion_tokens:maxTokens,stream:false};
   try{
-    const r=await timedFetch(`${BASE}/chat/completions`,{method:"POST",headers:headers(env),body:JSON.stringify(payload)}),body=await r.json().catch(()=>({}));
-    if(!r.ok)return json({ok:false,provider:"baidu-aistudio-llm",http_status:r.status,error:safeError(body,r.status),model,explicit_selection_only:true,automatic_global_routing:false,paid_fallback:false,secret_echo:false},r.status>=500?502:r.status);
+    const r=await timedFetch(`${BASE}/chat/completions`,{method:"POST",headers:headers(env),body:JSON.stringify(payload)}),{raw,body}=await parseResponse(r);
+    if(!r.ok)return json({ok:false,provider:"baidu-aistudio-llm",http_status:r.status,error:safeError(body,r.status,raw),model,explicit_selection_only:true,automatic_global_routing:false,paid_fallback:false,secret_echo:false},r.status>=500?502:r.status);
     return json({ok:true,provider:"baidu-aistudio-llm",model,content:contentOf(body),usage:usageOf(body),finish_reason:body?.choices?.[0]?.finish_reason||null,explicit_selection_only:true,automatic_global_routing:false,paid_fallback:false,secret_echo:false});
   }catch(e){return json({ok:false,provider:"baidu-aistudio-llm",error:String(e?.message||"BAIDU_LLM_FAILED").slice(0,120),explicit_selection_only:true,automatic_global_routing:false,paid_fallback:false,secret_echo:false},e?.status||502)}
 }
