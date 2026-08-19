@@ -2,6 +2,7 @@ import {probeHuaweiCredentialCrosscheck,probeHuaweiDirectFunctionGraphAuthDetail
 import {huaweiFunctionGraphMeta,huaweiJson,huaweiSignerSelftest,invokeHuaweiFunction,probeHuaweiFunctionGraph,probeHuaweiFunctionGraphAuth} from "./huawei-functiongraph.js";
 import {probeHuaweiOfficialSignerParity} from "./huawei-signer-parity.js";
 import {probeHuaweiMinimalSignedHeaders} from "./huawei-minimal-signedheaders-canary.js";
+import {probeHuaweiDateOnlySignature} from "./huawei-date-only-canary.js";
 
 const HEALTH_TTL_MS=300000;
 const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
@@ -10,6 +11,7 @@ const CROSSCHECK_TTL_MS=300000;
 const DIRECT_FG_AUTH_AUDIT_PATH="/v1/providers/huawei-functiongraph/direct-fg-auth-audit-6c38e291";
 const SIGNER_PARITY_AUDIT_PATH="/v1/providers/huawei-functiongraph/signer-parity-audit-b18e7024";
 const MINIMAL_SIGNEDHEADERS_AUDIT_PATH="/v1/providers/huawei-functiongraph/minimal-signedheaders-audit-c94310f6";
+const DATE_ONLY_AUDIT_PATH="/v1/providers/huawei-functiongraph/date-only-audit-9b2a51f7";
 let healthCache={at:0,value:null};
 let authCanaryCache={at:0,value:null};
 let crosscheckCache={at:0,value:null};
@@ -66,6 +68,10 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
   if(req.method==="GET"&&url.pathname===MINIMAL_SIGNEDHEADERS_AUDIT_PATH){
     const result=await probeHuaweiMinimalSignedHeaders(env);
     return huaweiJson({...result,audit_scope:"one-shot-minimal-signedheaders"},result.authenticated===true?200:503);
+  }
+  if(req.method==="GET"&&url.pathname===DATE_ONLY_AUDIT_PATH){
+    const result=await probeHuaweiDateOnlySignature(env);
+    return huaweiJson({...result,audit_scope:"one-shot-date-only"},result.authenticated===true?200:503);
   }
   if(req.method==="GET"&&url.pathname===DIRECT_FG_AUTH_AUDIT_PATH){
     const result=await probeHuaweiDirectFunctionGraphAuthDetail(env);
