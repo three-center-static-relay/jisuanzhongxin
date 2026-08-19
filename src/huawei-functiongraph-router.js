@@ -1,21 +1,10 @@
-import {probeHuaweiCredentialCrosscheck,probeHuaweiDirectFunctionGraphAuthDetail} from "./huawei-functiongraph-diagnostic.js";
+import {probeHuaweiCredentialCrosscheck} from "./huawei-functiongraph-diagnostic.js";
 import {huaweiFunctionGraphMeta,huaweiJson,huaweiSignerSelftest,invokeHuaweiFunction,probeHuaweiFunctionGraph,probeHuaweiFunctionGraphAuth} from "./huawei-functiongraph.js";
-import {probeHuaweiOfficialSignerParity} from "./huawei-signer-parity.js";
-import {probeHuaweiMinimalSignedHeaders} from "./huawei-minimal-signedheaders-canary.js";
-import {probeHuaweiDateOnlySignature} from "./huawei-date-only-canary.js";
-import {probeHuaweiEgressHeaderIntegrity} from "./huawei-egress-header-integrity.js";
-import {probeHuaweiExplicitHost} from "./huawei-explicit-host-canary.js";
 
 const HEALTH_TTL_MS=300000;
 const HEALTH_FORCE_MIN_INTERVAL_MS=30000;
 const AUTH_CANARY_TTL_MS=300000;
 const CROSSCHECK_TTL_MS=300000;
-const DIRECT_FG_AUTH_AUDIT_PATH="/v1/providers/huawei-functiongraph/direct-fg-auth-audit-6c38e291";
-const SIGNER_PARITY_AUDIT_PATH="/v1/providers/huawei-functiongraph/signer-parity-audit-b18e7024";
-const MINIMAL_SIGNEDHEADERS_AUDIT_PATH="/v1/providers/huawei-functiongraph/minimal-signedheaders-audit-c94310f6";
-const DATE_ONLY_AUDIT_PATH="/v1/providers/huawei-functiongraph/date-only-audit-9b2a51f7";
-const EGRESS_HEADER_AUDIT_PATH="/v1/providers/huawei-functiongraph/egress-header-audit-82d10f3b";
-const EXPLICIT_HOST_AUDIT_PATH="/v1/providers/huawei-functiongraph/explicit-host-audit-5c1f78a4";
 let healthCache={at:0,value:null};
 let authCanaryCache={at:0,value:null};
 let crosscheckCache={at:0,value:null};
@@ -68,24 +57,6 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/meta")return huaweiJson({ok:true,...huaweiFunctionGraphMeta(env)});
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/signer-selftest")return huaweiJson(await huaweiSignerSelftest());
-  if(req.method==="GET"&&url.pathname===SIGNER_PARITY_AUDIT_PATH)return huaweiJson(await probeHuaweiOfficialSignerParity(env));
-  if(req.method==="GET"&&url.pathname===EGRESS_HEADER_AUDIT_PATH)return huaweiJson(await probeHuaweiEgressHeaderIntegrity());
-  if(req.method==="GET"&&url.pathname===EXPLICIT_HOST_AUDIT_PATH){
-    const result=await probeHuaweiExplicitHost(env);
-    return huaweiJson({...result,audit_scope:"one-shot-explicit-host"},result.authenticated===true?200:503);
-  }
-  if(req.method==="GET"&&url.pathname===MINIMAL_SIGNEDHEADERS_AUDIT_PATH){
-    const result=await probeHuaweiMinimalSignedHeaders(env);
-    return huaweiJson({...result,audit_scope:"one-shot-minimal-signedheaders"},result.authenticated===true?200:503);
-  }
-  if(req.method==="GET"&&url.pathname===DATE_ONLY_AUDIT_PATH){
-    const result=await probeHuaweiDateOnlySignature(env);
-    return huaweiJson({...result,audit_scope:"one-shot-date-only"},result.authenticated===true?200:503);
-  }
-  if(req.method==="GET"&&url.pathname===DIRECT_FG_AUTH_AUDIT_PATH){
-    const result=await probeHuaweiDirectFunctionGraphAuthDetail(env);
-    return huaweiJson({...result,audit_scope:"one-shot-direct-functiongraph-auth-detail"},result.authenticated===true?200:503);
-  }
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/auth-canary"){
     if(!internalOnly(url))return denyExternalLiveDiagnostic();
     const result=await authCanary(env);
