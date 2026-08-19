@@ -49,6 +49,20 @@ assert.equal(metaBody.provider,"huawei-functiongraph");
 assert.equal(metaBody.configured,false);
 assert.equal(metaBody.secret_echo,false);
 
+const shapeEnv={HUAWEI_CLOUD_AK:"A".repeat(20),HUAWEI_CLOUD_SK:"S".repeat(40)};
+const shapeResponse=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/credential-shape"),shapeEnv);
+assert.equal(shapeResponse.status,200);
+const shape=await shapeResponse.json();
+assert.equal(shape.ok,true);
+assert.equal(shape.ak_length,20);
+assert.equal(shape.sk_length,40);
+assert.equal(shape.ak_alnum,true);
+assert.equal(shape.sk_alnum,true);
+assert.equal(shape.secret_echo,false);
+const shapeSerialized=JSON.stringify(shape);
+assert.equal(shapeSerialized.includes("A".repeat(20)),false);
+assert.equal(shapeSerialized.includes("S".repeat(40)),false);
+
 const fresh1=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/health?fresh=1"),{});
 assert.equal(fresh1.status,503);
 const freshBody1=await fresh1.json();
