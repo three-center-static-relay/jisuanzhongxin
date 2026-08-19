@@ -72,10 +72,6 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
     const result=await health(env,{force:url.searchParams.get("fresh")==="1"});
     return huaweiJson(result,result.ok===true?200:503);
   }
-  if(req.method==="GET"&&url.pathname==="/_diag/b3a3tpjgnBXXHWOnTdtPsn0n"){
-    const result=await health(env,{force:true});
-    return huaweiJson({ok:result.ok===true,configured:result.configured===true,provider:"huawei-functiongraph",http_status:result.http_status??0,invoke_status:result.invoke_status??null,echo_verified:result.echo_verified===true,acceptance_state:result.acceptance_state??null,route_eligible:false,paid_fallback:false,secret_echo:false,one_shot:true},result.ok===true?200:503);
-  }
   if(req.method==="POST"&&url.pathname==="/v1/providers/huawei-functiongraph/compute"){
     if(!internalOnly(url))return huaweiJson({ok:false,error:"POLICY_DENIED",message:"Huawei FunctionGraph execution is service-binding internal only",route_eligible:false,secret_echo:false},403);
     let body={};try{body=await req.json()}catch{return huaweiJson({ok:false,error:"INVALID_JSON",route_eligible:false,secret_echo:false},400)}
