@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+const {probeHuaweiNodeHttpsEmpty}=await import("../src/huawei-node-https-empty-canary.js");
+const result=await probeHuaweiNodeHttpsEmpty({});
+assert.equal(result.ok,false);
+assert.equal(result.configured,false);
+assert.equal(result.transport,"node:https");
+assert.equal(result.request_semantics,"official-listfunctions-empty-get");
+assert.equal(result.body_bytes,0);
+assert.equal(result.content_length_sent,false);
+assert.equal(result.http_status,0);
+assert.equal(result.upstream_called,false);
+assert.equal(result.route_eligible,false);
+assert.equal(result.paid_fallback,false);
+assert.equal(result.secret_echo,false);
+console.log(JSON.stringify({ok:true,suite:"huawei-node-https-empty-contract",node_https_imported:true,official_listfunctions_shape:true,no_upstream:true,secrets_redacted:true}));
