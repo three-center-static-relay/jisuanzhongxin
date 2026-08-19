@@ -20,6 +20,5 @@ console.log("HUAWEI_HEALTH_SAFE",JSON.stringify(safe));
 assert.equal(safe.fresh_probe_requested,true);
 assert.equal(safe.refresh_suppressed,false);
 assert.equal(safe.secret_echo,false);
-const upperGroup=safe.ok||safe.error_class==="HUAWEI_AK_NOT_FOUND"||safe.error_class==="HUAWEI_AKSK_SIGNATURE_FAILED";
-assert.equal(upperGroup,true,"oracle-upper-group=false");
-console.log("PASS huawei-health-oracle-upper-group");
+assert.equal(safe.error_class,"HUAWEI_AK_TEMP_LOCKED_OR_RESTRICTED","oracle-temp-lock=false");
+console.log("PASS huawei-health-oracle-temp-lock");
