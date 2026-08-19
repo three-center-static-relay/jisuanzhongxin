@@ -55,8 +55,11 @@ export function classifyHuaweiError(errorCode,errorMsg){
     if(msg.includes("get secretkey failed")||msg.includes("ak not exist"))return"HUAWEI_AK_NOT_FOUND";
     if(msg.includes("reach the limit")||msg.includes("forbidden"))return"HUAWEI_AK_TEMP_LOCKED_OR_RESTRICTED";
     if(msg.includes("decrypt token fail"))return"HUAWEI_TOKEN_DECRYPT_FAILED";
+    if(msg.includes("x-auth-token not found"))return"HUAWEI_X_AUTH_TOKEN_MISSING";
+    if(msg.includes("token expires")||msg.includes("token expired"))return"HUAWEI_TOKEN_EXPIRED";
     return"HUAWEI_IAM_AUTH_FAILED";
   }
+  if(code==="APIGW.0302"||code==="APIG.0302")return"HUAWEI_IAM_NOT_AUTHORIZED";
   return code?"HUAWEI_UPSTREAM_ERROR":"HUAWEI_FUNCTION_INVOCATION_FAILED";
 }
 
@@ -77,6 +80,25 @@ export function huaweiFunctionGraphMeta(env={}){
     route_eligible:false,
     secret_echo:false
   };
+}
+
+export async function probeHuaweiFunctionGraphAuth(env){
+  const parsed=parseHuaweiFunctionUrn(env.HUAWEI_FUNCTION_URN);
+  const ak=String(env.HUAWEI_CLOUD_AK||"").trim(),sk=String(env.HUAWEI_CLOUD_SK||"").trim();
+  if(!ak||!sk||!parsed.ok)return{ok:false,configured:false,provider:"huawei-functiongraph",canary:"list-functions-auth",http_status:0,authenticated:false,authorized:false,error_class:!parsed.ok?"INVALID_HUAWEI_FUNCTION_URN":"HUAWEI_AK_SK_NOT_CONFIGURED",route_eligible:false,paid_fallback:false,secret_echo:false};
+  const endpoint=`https://functiongraph.${parsed.region}.myhuaweicloud.com`;
+  const url=`${endpoint}/v2/${parsed.project_id}/fgs/functions?maxitems=1`;
+  const baseHeaders={"content-type":"application/json","x-project-id":parsed.project_id};
+  try{
+    const signed=await signHuaweiRequest({method:"GET",url,headers:baseHeaders,body:"",ak,sk});
+    const response=await fetch(url,{method:"GET",headers:{...baseHeaders,"x-sdk-date":signed.x_sdk_date,authorization:signed.authorization}});
+    const text=await response.text();
+    const responseBody=parseJson(text)||{};
+    const upstreamErrorCode=String(responseBody?.error_code||"").slice(0,80)||null;
+    const errorClass=response.ok?null:classifyHuaweiError(upstreamErrorCode,responseBody?.error_msg);
+    const authenticated=response.status!==401;
+    return{ok:authenticated,configured:true,provider:"huawei-functiongraph",canary:"list-functions-auth",http_status:response.status,authenticated,authorized:response.ok,region:parsed.region,upstream_error_code:upstreamErrorCode,error_class:errorClass,error:authenticated?null:errorClass,route_eligible:false,paid_fallback:false,secret_echo:false};
+  }catch(error){return{ok:false,configured:true,provider:"huawei-functiongraph",canary:"list-functions-auth",http_status:0,authenticated:false,authorized:false,region:parsed.region,upstream_error_code:null,error_class:"HUAWEI_TRANSPORT_OR_SIGNING_RUNTIME_ERROR",error:safeError(error),route_eligible:false,paid_fallback:false,secret_echo:false}}
 }
 
 export async function invokeHuaweiFunction(env,payload,{returnLog=false}={}){
