@@ -28,7 +28,8 @@ export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
         runtime_receipt:prior.runtime_receipt,
         stopped:{http_status:stopped.stop_http_status||null},
         subrequest_budget_max:50,
-        polling_rounds_max:5,
+        polling_rounds_max:8,
+        polling_sleep_seconds:30,
         free_only:true,
         paid_fallback:false,
         secrets_redacted:true
@@ -62,8 +63,8 @@ export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
         }
       );
 
-      for(let i=0;i<5;i++){
-        await step.sleep(`wait for Studio runtime ${i+1}`,"20 seconds");
+      for(let i=0;i<8;i++){
+        await step.sleep(`wait for Studio runtime ${i+1}`,"30 seconds");
         const s=await step.do(`inspect Studio receipt ${i+1}`,STATUS_ATTEMPT,async()=>getModelScopeStudioLiteStatus(this.env));
         if(verifiedV3(s)){
           verified=s;
@@ -98,7 +99,8 @@ export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
       deployed:{http_status:deployed.deploy_http_status||null},
       stopped:{http_status:stopped.stop_http_status||null},
       subrequest_budget_max:50,
-      polling_rounds_max:5,
+      polling_rounds_max:8,
+      polling_sleep_seconds:30,
       free_only:true,
       paid_fallback:false,
       secrets_redacted:true
