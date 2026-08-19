@@ -17,7 +17,7 @@ for(const literal of [
   "resource_type",
   'type===\"free\"',
   "paid_fallback:false",
-  "private:true",
+  'visibility:\"private\"',
   "/deploy",
   "/stop",
   "/logs/run",
@@ -59,5 +59,6 @@ for(const forbidden of [
 assert.ok(!wrangler.includes('"schedules"'),"Permanent Studio Lite Workflow must not self-schedule");
 assert.ok(!entry.includes('req.method===\"POST\"&&url.pathname===\"/v1/selftest/modelscope-studio-lite\"'),"Public Studio Lite status endpoint must remain read-only");
 assert.ok(entry.indexOf('url.pathname===\"/v1/admin/modelscope/studio-lite/stop\"')>=0,"Internal emergency stop route must exist");
+assert.ok(!studio.includes("private:true"),"Obsolete ModelScope private:true settings field must not return");
 
-console.log(JSON.stringify({ok:true,suite:"modelscope-studio-lite-cpu-runner-contract",module_imported:true,target_hardware:"platform/2v-cpu-16g-mem",nominal_cpu:2,nominal_memory_gb:16,min_effective_cpu:1.9,min_effective_memory_gib:14,free_only:true,paid_fallback:false,private_studio:true,phased_runner:true,idempotent_upload:true,stop_independent_of_hardware_catalog:true,public_write_surface:false,internal_workflow_control:true,demand_driven:true}));
+console.log(JSON.stringify({ok:true,suite:"modelscope-studio-lite-cpu-runner-contract",module_imported:true,target_hardware:"platform/2v-cpu-16g-mem",nominal_cpu:2,nominal_memory_gb:16,min_effective_cpu:1.9,min_effective_memory_gib:14,free_only:true,paid_fallback:false,private_studio:true,visibility_contract:"private",phased_runner:true,idempotent_upload:true,stop_independent_of_hardware_catalog:true,public_write_surface:false,internal_workflow_control:true,demand_driven:true}));
