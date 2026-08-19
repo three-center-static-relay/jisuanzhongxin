@@ -7,7 +7,7 @@ const TARGET_CPU=2;
 const TARGET_MEMORY_GB=16;
 const MIN_EFFECTIVE_CPU=1.9;
 const MIN_EFFECTIVE_MEMORY_GIB=14;
-const REVISION="studio-lite-runtime-v2-20260817";
+const REVISION="studio-lite-runtime-v3-20260820";
 const MARKER="THREE_CENTER_MODELSCOPE_LITE_RUNTIME:";
 const str=v=>String(v??"").trim();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -40,8 +40,8 @@ async function detail(t,owner){return req(`${OPENAPI}/studios/${encodeURICompone
 async function logs(t,owner){return req(`${OPENAPI}/studios/${encodeURIComponent(owner)}/${encodeURIComponent(REPO_NAME)}/logs/run?page_num=1&page_size=100`,{headers:headers(t,false),timeout:15000})}
 async function stop(t,owner){return req(`${OPENAPI}/studios/${encodeURIComponent(owner)}/${encodeURIComponent(REPO_NAME)}/stop`,{method:"POST",headers:headers(t),body:null,timeout:15000})}
 async function deploy(t,owner){return req(`${OPENAPI}/studios/${encodeURIComponent(owner)}/${encodeURIComponent(REPO_NAME)}/deploy`,{method:"POST",headers:headers(t),body:null,timeout:15000})}
-async function patchSettings(t,owner){return req(`${OPENAPI}/studios/${encodeURIComponent(owner)}/${encodeURIComponent(REPO_NAME)}/settings`,{method:"PATCH",headers:headers(t),body:{display_name:"Three Center CPU Lite",private:true,sdk_type:SDK_TYPE,hardware:TARGET_HARDWARE},timeout:15000})}
-async function createStudio(t,owner){return req(`${OPENAPI}/studios`,{method:"POST",headers:headers(t),body:{repo_name:REPO_NAME,owner,display_name:"Three Center CPU Lite",private:true,sdk_type:SDK_TYPE,hardware:TARGET_HARDWARE,description:"Three-center free-only light CPU runner"},timeout:20000})}
+async function patchSettings(t,owner){return req(`${OPENAPI}/studios/${encodeURIComponent(owner)}/${encodeURIComponent(REPO_NAME)}/settings`,{method:"PATCH",headers:headers(t),body:{display_name:"Three Center CPU Lite",visibility:"private",sdk_type:SDK_TYPE,hardware:TARGET_HARDWARE},timeout:15000})}
+async function createStudio(t,owner){return req(`${OPENAPI}/studios`,{method:"POST",headers:headers(t),body:{repo_name:REPO_NAME,owner,display_name:"Three Center CPU Lite",visibility:"private",sdk_type:SDK_TYPE,hardware:TARGET_HARDWARE,description:"Three-center free-only light CPU runner"},timeout:20000})}
 async function commitAppAction(t,owner,action){return req(`${LEGACY}/repos/studios/${encodeURIComponent(owner)}/${encodeURIComponent(REPO_NAME)}/commit/master`,{method:"POST",headers:legacyHeaders(t),body:{commit_message:`Three-center Studio Lite ${REVISION}`,actions:[operation("app.py",appPy(),action)]},timeout:30000})}
 async function ensureApp(t,owner){
   const update=await commitAppAction(t,owner,"update");
@@ -58,14 +58,14 @@ async function identity(env={}){
 }
 async function readiness(env={}){
   const id=await identity(env);if(!id.ok)return id;
-  const hw=await req(`${OPENAPI}/studios/hardware?sdk_type=${encodeURIComponent(SDK_TYPE)}`,{headers:headers(id.token,false)}),target=hw.ok?targetHardware(hw.data):null;
+  const hw=await req(`${OPENAPI}/studios/hardware?sdk_type=${encodeURIComponent(SDK_TYPE)}&studio=${encodeURIComponent(`${id.owner}/${REPO_NAME}`)}`,{headers:headers(id.token,false)}),target=hw.ok?targetHardware(hw.data):null;
   const ok=hw.ok&&Boolean(target);
   return{...id,ok,target,stock_available:target?.has_stock===true,hardware_status:hw.status,error_class:ok?null:!hw.ok?`MODELSCOPE_HARDWARE_HTTP_${hw.status}`:"TARGET_FREE_HARDWARE_UNAVAILABLE"};
 }
 
 export async function getModelScopeStudioLiteStatus(env={}){
   const id=await identity(env);if(!id.ok)return{ok:false,selftest:"modelscope-studio-lite",configured:id.configured===true,authenticated:id.authenticated===true,target_hardware:TARGET_HARDWARE,hardware:null,runtime_e2e_verified:false,route_eligible:false,error_class:id.error_class,free_only:true,paid_fallback:false,secrets_redacted:true};
-  const hw=await req(`${OPENAPI}/studios/hardware?sdk_type=${encodeURIComponent(SDK_TYPE)}`,{headers:headers(id.token,false)}),target=hw.ok?targetHardware(hw.data):null;
+  const hw=await req(`${OPENAPI}/studios/hardware?sdk_type=${encodeURIComponent(SDK_TYPE)}&studio=${encodeURIComponent(`${id.owner}/${REPO_NAME}`)}`,{headers:headers(id.token,false)}),target=hw.ok?targetHardware(hw.data):null;
   const d=await detail(id.token,id.owner),l=d.ok?await logs(id.token,id.owner):null,receipt=l?.ok?parseReceipt(payload(l)):null,pass=receiptPass(receipt);
   return{ok:pass,selftest:"modelscope-studio-lite",configured:true,authenticated:true,target_hardware:TARGET_HARDWARE,hardware:target,catalog_verified:Boolean(target),stock_available:target?.has_stock===true,studio_found:d.ok,studio_detail_http_status:d.status,log_http_status:l?.status||null,runtime_receipt:cleanReceipt(receipt),runtime_e2e_verified:pass,route_eligible:pass&&Boolean(target),error_class:pass?null:!d.ok?`MODELSCOPE_STUDIO_DETAIL_HTTP_${d.status}`:!l?.ok?`MODELSCOPE_STUDIO_LOG_HTTP_${l?.status||0}`:"MODELSCOPE_STUDIO_LITE_NOT_VERIFIED",free_only:true,paid_fallback:false,secrets_redacted:true};
 }
@@ -105,7 +105,7 @@ export async function runModelScopeStudioLiteBootstrap(env={}){
   let receipt=null,lastLogStatus=0;
   for(let i=0;i<25;i++){await sleep(3000);const l=await logs(id.token,id.owner);lastLogStatus=l.status;if(l.ok){receipt=parseReceipt(payload(l));if(receipt)break}}
   const stopped=await stopModelScopeStudioLite(env),pass=receiptPass(receipt);
-  return{ok:pass,stage:pass?"runtime-verified":"runtime-not-verified",studio_created:prep.studio_created,upload_action:prep.upload_action,upload_http_status:prep.upload_http_status,settings_http_status:prep.settings_http_status,deploy_http_status:dep.deploy_http_status,log_http_status:lastLogStatus,stop_http_status:stopped.stop_http_status,hardware:prep.hardware,runtime_receipt:cleanReceipt(receipt),free_only:true,paid_fallback:false,secrets_redacted:true,error_class:pass?null:"MODELSCOPE_STUDIO_LITE_RUNTIME_E2E_FAILED"};
+  return{ok:pass,stage:pass?"runtime-verified":"runtime-not-verified",studio_created:prep.studio_created,upload_action:prep.upload_action,upload_http_status:prep.upload_http_status,settings_http_status:prep.settings_http_status,deploy_http_status:dep.deploy_http_status,log_http_status:lastLogStatus,stop_http_status:stopped.stop_http_status,hardware:prep.hardware,runtime_receipt:cleanReceipt(receipt),runtime_e2e_verified:pass,route_eligible:pass,free_only:true,paid_fallback:false,secrets_redacted:true,error_class:pass?null:"MODELSCOPE_STUDIO_LITE_RUNTIME_E2E_FAILED"};
 }
 
 export const modelScopeStudioLiteMeta=()=>({provider:"modelscope",repo_name:REPO_NAME,sdk_type:SDK_TYPE,target_hardware:TARGET_HARDWARE,nominal_cpu:TARGET_CPU,nominal_memory_gb:TARGET_MEMORY_GB,min_effective_cpu:MIN_EFFECTIVE_CPU,min_effective_memory_gib:MIN_EFFECTIVE_MEMORY_GIB,revision:REVISION,phased_runner:true,idempotent_upload:true,stop_requires_hardware_catalog:false,free_only:true,paid_fallback:false});
