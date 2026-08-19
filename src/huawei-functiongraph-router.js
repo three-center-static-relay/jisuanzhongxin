@@ -49,7 +49,7 @@ async function health(env,{force=false}={}){
   }
   const value=await probeHuaweiFunctionGraph(env);
   healthCache={at:now,value};
-  return{...value,cached_health:false,cache_ttl_ms:HEALTH_TTL_MS,cache_age_ms:age,fresh_probe_requested:force,refresh_suppressed:false};
+  return{...value,cached_health:false,cache_ttl_ms:HEALTH_TTL_MS,cache_age_ms:0,fresh_probe_requested:force,refresh_suppressed:false};
 }
 
 export async function maybeHandleHuaweiFunctionGraph(req,env){
