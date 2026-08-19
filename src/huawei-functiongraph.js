@@ -87,7 +87,7 @@ export async function invokeHuaweiFunction(env,payload,{returnLog=false}={}){
   const path=`/v2/${parsed.project_id}/fgs/functions/${parsed.urn}/invocations`;
   const url=`${endpoint}${path}`;
   const body=JSON.stringify(payload&&typeof payload==="object"?payload:{});
-  const baseHeaders={"content-type":"application/json","x-cff-request-version":"v1","x-project-id":parsed.project_id,...(returnLog?{"x-cff-log-type":"tail"}:{})};
+  const baseHeaders={"content-type":"application/json","x-cff-request-version":"v1",...(returnLog?{"x-cff-log-type":"tail"}:{})};
   try{
     const signed=await signHuaweiRequest({method:"POST",url,headers:baseHeaders,body,ak,sk});
     const response=await fetch(url,{method:"POST",headers:{...baseHeaders,"x-sdk-date":signed.x_sdk_date,authorization:signed.authorization},body});
