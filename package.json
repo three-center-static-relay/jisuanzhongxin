@@ -9,6 +9,9 @@
     "test:commercial-spatial-signal": "node tests/commercial-spatial-signal.mjs",
     "test:capability-manifest": "node tests/capability-manifest-contract.mjs"
   },
+  "dependencies": {
+    "e2b": "2.31.0"
+  },
   "devDependencies": {
     "wrangler": "^4.0.0",
     "msw": "^2.0.0"

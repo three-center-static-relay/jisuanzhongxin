@@ -1,5 +1,6 @@
 import production,{CenterGate} from "./production.js";
 import {maybeHandleBaiduCircleCI} from "./baidu-circleci-router.js";
+import {maybeHandleBaiduManualAcceptance} from "./baidu-manual-acceptance.js";
 import {maybeHandleModels} from "./model-router.js";
 import {maybeHandleBenchmarks} from "./benchmark-router.js";
 import {maybeHandleOpenEOHandoff} from "./openeo-handoff-router.js";
@@ -81,6 +82,8 @@ export default {
     if(huaweiHandled)return huaweiHandled;
     const aliyunHandled=await maybeHandleAliyunFCSandbox(req,env);
     if(aliyunHandled)return aliyunHandled;
+    const baiduManualHandled=await maybeHandleBaiduManualAcceptance(req,env);
+    if(baiduManualHandled)return baiduManualHandled;
     const openEOHandled=await maybeHandleOpenEOHandoff(req,env);
     if(openEOHandled)return openEOHandled;
     req=await normalizeMedicalImagingRequest(req);
