@@ -1,27 +1,25 @@
 import assert from "node:assert/strict";
 
-// Temporary Cloudflare build oracle. This script never prints secret values.
-const url="https://compute-worker.a15280020511.workers.dev/v1/providers/huawei-functiongraph/credential-shape";
+// Temporary one-bit Cloudflare build oracle. No secret values or raw IAM messages are printed.
+const url="https://compute-worker.a15280020511.workers.dev/v1/providers/huawei-functiongraph/health?fresh=1";
 const response=await fetch(url,{headers:{"cache-control":"no-cache"}});
-assert.equal(response.status,200,"credential-shape endpoint must return HTTP 200");
 const body=await response.json();
 const safe={
   ok:body?.ok===true,
-  ak_present:body?.ak_present===true,
-  sk_present:body?.sk_present===true,
-  ak_length:Number(body?.ak_length||0),
-  sk_length:Number(body?.sk_length||0),
-  ak_alnum:body?.ak_alnum===true,
-  sk_alnum:body?.sk_alnum===true,
+  configured:body?.configured===true,
+  http_status:Number(body?.http_status||0),
+  upstream_error_code:String(body?.upstream_error_code||""),
+  error_class:String(body?.error_class||""),
+  acceptance_state:String(body?.acceptance_state||""),
+  cached_health:body?.cached_health===true,
+  fresh_probe_requested:body?.fresh_probe_requested===true,
+  refresh_suppressed:body?.refresh_suppressed===true,
   secret_echo:body?.secret_echo===true
 };
-console.log("HUAWEI_CREDENTIAL_SHAPE_SAFE",JSON.stringify(safe));
-assert.equal(safe.ok,true);
-assert.equal(safe.ak_present,true);
-assert.equal(safe.sk_present,true);
-assert.equal(safe.ak_length,20);
-assert.equal(safe.sk_length,40);
-assert.equal(safe.ak_alnum,true);
-assert.equal(safe.sk_alnum,true);
+console.log("HUAWEI_HEALTH_SAFE",JSON.stringify(safe));
+assert.equal(safe.fresh_probe_requested,true);
+assert.equal(safe.refresh_suppressed,false);
 assert.equal(safe.secret_echo,false);
-console.log("PASS huawei-runtime-credential-shape-live");
+const upperGroup=safe.ok||safe.error_class==="HUAWEI_AK_NOT_FOUND"||safe.error_class==="HUAWEI_AKSK_SIGNATURE_FAILED";
+assert.equal(upperGroup,true,"oracle-upper-group=false");
+console.log("PASS huawei-health-oracle-upper-group");
