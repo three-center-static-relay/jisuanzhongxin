@@ -2,6 +2,7 @@ import { Sandbox } from "e2b";
 
 const DEFAULT_REGION="cn-beijing";
 const API_HOST_SUFFIX="e2b.fc.aliyuncs.com";
+const ACCEPTANCE_REVISION="2026-08-19-e2b-2.35.3";
 const MANUAL_ACCEPTANCE_TOKEN_SHA256="5a143d0ffa53b125ff6a463eb7499f71de98d94efa9c1cce33a9ad006f3ef089";
 
 const json=(body,status=200)=>Response.json(body,{status,headers:{"cache-control":"no-store"}});
@@ -29,6 +30,7 @@ export function aliyunFCSandboxMeta(env={}){
     provider:"aliyun-fc-sandbox",
     role:"china-sandbox-candidate",
     protocol:"e2b-compatible-http",
+    acceptance_revision:ACCEPTANCE_REVISION,
     region:region(env),
     api_key_secret:"ALIYUN_FC_SANDBOX_API_KEY",
     region_var:"ALIYUN_FC_SANDBOX_REGION",
@@ -74,9 +76,9 @@ async function runBoundedRuntimeAcceptance(env){
     const shellOk=String(shell?.stdout||"").trim()==="ALIYUN_SHELL_OK";
     const pythonOk=String(python?.stdout||"").trim()==="42";
     const fileOk=String(fileRead||"").trim()===marker;
-    return {ok:shellOk&&pythonOk&&fileOk,provider:"aliyun-fc-sandbox",template:"code-interpreter-v1",shell_ok:shellOk,python_ok:pythonOk,file_write_read_ok:fileOk,runtime_e2e_verified:shellOk&&pythonOk&&fileOk,max_lifetime_seconds:60,paid_fallback:false,production_routing:false,route_eligible:false,elapsed_ms:Date.now()-started,secrets_redacted:true};
+    return {ok:shellOk&&pythonOk&&fileOk,provider:"aliyun-fc-sandbox",acceptance_revision:ACCEPTANCE_REVISION,template:"code-interpreter-v1",shell_ok:shellOk,python_ok:pythonOk,file_write_read_ok:fileOk,runtime_e2e_verified:shellOk&&pythonOk&&fileOk,max_lifetime_seconds:60,paid_fallback:false,production_routing:false,route_eligible:false,elapsed_ms:Date.now()-started,secrets_redacted:true};
   }catch(e){
-    return {ok:false,provider:"aliyun-fc-sandbox",runtime_e2e_verified:false,error_class:String(e?.name||"ALIYUN_RUNTIME_E2E_FAILED").slice(0,80),message:String(e?.message||"ALIYUN_RUNTIME_E2E_FAILED").slice(0,180),max_lifetime_seconds:60,paid_fallback:false,production_routing:false,route_eligible:false,elapsed_ms:Date.now()-started,secrets_redacted:true};
+    return {ok:false,provider:"aliyun-fc-sandbox",acceptance_revision:ACCEPTANCE_REVISION,runtime_e2e_verified:false,error_class:String(e?.name||"ALIYUN_RUNTIME_E2E_FAILED").slice(0,80),message:String(e?.message||"ALIYUN_RUNTIME_E2E_FAILED").slice(0,180),max_lifetime_seconds:60,paid_fallback:false,production_routing:false,route_eligible:false,elapsed_ms:Date.now()-started,secrets_redacted:true};
   }finally{
     if(sandbox){try{await sandbox.kill();killed=true}catch{}}
     void killed;
