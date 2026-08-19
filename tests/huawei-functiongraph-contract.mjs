@@ -49,6 +49,20 @@ assert.equal(metaBody.provider,"huawei-functiongraph");
 assert.equal(metaBody.configured,false);
 assert.equal(metaBody.secret_echo,false);
 
+const fresh1=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/health?fresh=1"),{});
+assert.equal(fresh1.status,503);
+const freshBody1=await fresh1.json();
+assert.equal(freshBody1.cached_health,false);
+assert.equal(freshBody1.fresh_probe_requested,true);
+assert.equal(freshBody1.refresh_suppressed,false);
+
+const fresh2=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/health?fresh=1"),{});
+assert.equal(fresh2.status,503);
+const freshBody2=await fresh2.json();
+assert.equal(freshBody2.cached_health,true);
+assert.equal(freshBody2.fresh_probe_requested,true);
+assert.equal(freshBody2.refresh_suppressed,true);
+
 const denied=await maybeHandleHuaweiFunctionGraph(new Request("https://example.test/v1/providers/huawei-functiongraph/compute",{method:"POST",headers:{"content-type":"application/json"},body:"{}"}),{});
 assert.equal(denied.status,403);
 const deniedBody=await denied.json();
