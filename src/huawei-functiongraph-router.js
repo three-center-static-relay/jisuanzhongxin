@@ -1,4 +1,4 @@
-import {probeHuaweiCredentialCrosscheck} from "./huawei-functiongraph-diagnostic.js";
+import {probeHuaweiCredentialCrosscheck,probeHuaweiDirectFunctionGraphAuthDetail} from "./huawei-functiongraph-diagnostic.js";
 import {huaweiFunctionGraphMeta,huaweiJson,huaweiSignerSelftest,invokeHuaweiFunction,probeHuaweiFunctionGraph,probeHuaweiFunctionGraphAuth} from "./huawei-functiongraph.js";
 
 const HEALTH_TTL_MS=300000;
@@ -59,8 +59,8 @@ export async function maybeHandleHuaweiFunctionGraph(req,env){
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/credential-shape")return huaweiJson(credentialShape(env));
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/signer-selftest")return huaweiJson(await huaweiSignerSelftest());
   if(req.method==="GET"&&url.pathname===DIRECT_FG_AUTH_AUDIT_PATH){
-    const result=await probeHuaweiFunctionGraphAuth(env);
-    return huaweiJson({...result,audit_scope:"one-shot-direct-functiongraph-auth"},result.authenticated===true?200:503);
+    const result=await probeHuaweiDirectFunctionGraphAuthDetail(env);
+    return huaweiJson({...result,audit_scope:"one-shot-direct-functiongraph-auth-detail"},result.authenticated===true?200:503);
   }
   if(req.method==="GET"&&url.pathname==="/v1/providers/huawei-functiongraph/auth-canary"){
     if(!internalOnly(url))return denyExternalLiveDiagnostic();
