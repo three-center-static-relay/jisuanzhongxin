@@ -40,7 +40,7 @@ export function baiduLLMMeta(env={}){return{
 
 export async function baiduLLMCanary(env={}){
   if(!token(env))return{ok:false,provider:"baidu-aistudio-llm",configured:false,authenticated:false,inference_ok:false,error_class:"BAIDU_AISTUDIO_ACCESS_TOKEN_NOT_CONFIGURED",paid_fallback:false,secret_echo:false};
-  const payload={model:DEFAULT_MODEL,messages:[{role:"user",content:"Reply with exactly: 42"}],temperature:0,max_tokens:8,stream:false};
+  const payload={model:DEFAULT_MODEL,messages:[{role:"user",content:"Reply with exactly: 42"}],temperature:0.01,max_completion_tokens:8,stream:false};
   try{
     const r=await timedFetch(`${BASE}/chat/completions`,{method:"POST",headers:headers(env),body:JSON.stringify(payload)});
     const body=await r.json().catch(()=>({})),text=contentOf(body),usage=usageOf(body),correct=/^42[.!。！]?$/.test(text);
@@ -63,8 +63,10 @@ async function invoke(req,env){
     clean.push({role,content});
   }
   if(!clean.length)return json({ok:false,error:"MESSAGES_REQUIRED"},400);
-  const maxTokens=Math.max(2,Math.min(MAX_OUTPUT_TOKENS,Number(input.max_tokens||128)||128));
-  const payload={model,messages:clean,temperature:Number.isFinite(Number(input.temperature))?Math.max(0,Math.min(1,Number(input.temperature))):0.2,max_tokens:maxTokens,stream:false};
+  const maxTokens=Math.max(2,Math.min(MAX_OUTPUT_TOKENS,Number(input.max_completion_tokens??input.max_tokens??128)||128));
+  const rawTemperature=Number(input.temperature);
+  const temperature=Number.isFinite(rawTemperature)?Math.max(0.01,Math.min(1,rawTemperature)):0.2;
+  const payload={model,messages:clean,temperature,max_completion_tokens:maxTokens,stream:false};
   try{
     const r=await timedFetch(`${BASE}/chat/completions`,{method:"POST",headers:headers(env),body:JSON.stringify(payload)}),body=await r.json().catch(()=>({}));
     if(!r.ok)return json({ok:false,provider:"baidu-aistudio-llm",http_status:r.status,error:safeError(body,r.status),model,explicit_selection_only:true,automatic_global_routing:false,paid_fallback:false,secret_echo:false},r.status>=500?502:r.status);
