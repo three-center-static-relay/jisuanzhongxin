@@ -18,8 +18,10 @@ for(const literal of [
 ]) assert.ok(studio.includes(literal),`Missing Studio Lite safety contract: ${literal}`);
 
 for(const literal of [
-  "2026-08-20-workflow-v4-pass","free-light-cpu-demand-runner","production-free-demand","runtime_e2e_attested:true","explicit-free-light-cpu-workflow",
-  "explicit_selection_only:true","automatic_global_routing:false","demand-workflow-auto-stop","free_only:true","paid_fallback:false"
+  "2026-08-20-business-task-sum-e2e-pass","free-light-cpu-bounded-task-runner","production-free-demand","runtime_e2e_attested:true",
+  "business_task_e2e_attested:true","generic_business_task_adapter:true","free-light-cpu-bounded-numerical-task",
+  "explicit_selection_only:false","automatic_global_routing:ready","demand-workflow-auto-stop","ephemeral-studio-secret",
+  "workflow_payload_contains_task_values:false","arbitrary_code:false","free_only:true","paid_fallback:false"
 ]) assert.ok(productionStatusSrc.includes(literal),`Missing Studio Lite production status contract: ${literal}`);
 
 const accepted=productionStatus({configured:true,authenticated:true,studio_found:true,catalog_verified:true,hardware:{name:"platform/2v-cpu-16g-mem",resource_type:"free",has_stock:true},runtime_e2e_verified:false});
@@ -27,25 +29,39 @@ assert.equal(accepted.ok,true);
 assert.equal(accepted.route_eligible,true);
 assert.equal(accepted.production_accepted,true);
 assert.equal(accepted.runtime_e2e_attested,true);
+assert.equal(accepted.business_task_e2e_attested,true);
+assert.equal(accepted.generic_business_task_adapter,true);
+assert.equal(accepted.automatic_global_routing,true);
+assert.equal(accepted.explicit_selection_only,false);
 assert.equal(accepted.current_runtime_e2e_verified,false);
 assert.equal(accepted.production_receipt.cpu_effective,2);
 assert.equal(accepted.production_receipt.memory_gib_effective,15.35);
 assert.equal(accepted.production_receipt.square_sum_correct,true);
 assert.equal(accepted.production_receipt.result_digest_present,true);
 assert.equal(accepted.production_receipt.python,"3.11.11");
+assert.equal(accepted.business_task_receipt.op,"sum");
+assert.equal(accepted.business_task_receipt.result,15);
+assert.equal(accepted.business_task_receipt.result_digest_present,true);
+assert.equal(accepted.business_task_receipt.task_secret_cleared,true);
+assert.equal(accepted.business_task_receipt.gate_released,true);
+assert.deepEqual(accepted.supported_task_ops,["sum","stats","dot","matmul","linear_regression","monte_carlo_pi"]);
+assert.equal(accepted.task_transport,"ephemeral-studio-secret");
+assert.equal(accepted.workflow_payload_contains_task_values,false);
+assert.equal(accepted.arbitrary_code,false);
 const noStock=productionStatus({configured:true,authenticated:true,studio_found:true,catalog_verified:true,hardware:{name:"platform/2v-cpu-16g-mem",resource_type:"free",has_stock:false}});
 assert.equal(noStock.route_eligible,false);
+assert.equal(noStock.automatic_global_routing,false);
 
 for(const literal of [
   "/v1/selftest/modelscope-studio-lite","/v1/admin/modelscope/studio-lite/status","/v1/admin/modelscope/studio-lite/prepare","/v1/admin/modelscope/studio-lite/deploy",
-  "/v1/admin/modelscope/studio-lite/stop","/v1/admin/modelscope/studio-lite-bootstrap","/v1/admin/modelscope/studio-lite/run","/v1/admin/modelscope/studio-lite/workflow",
+  "/v1/admin/modelscope/studio-lite/stop","/v1/admin/modelscope/studio-lite-bootstrap","/v1/admin/modelscope/studio-lite/run","/v1/admin/modelscope/studio-lite/compute","/v1/admin/modelscope/studio-lite/workflow",
   "MODELSCOPE_STUDIO_WORKFLOW","compute.internal","modelScopeLiteProductionStatus"
 ]) assert.ok(entry.includes(literal),`Missing Studio Lite internal control-plane contract: ${literal}`);
 
 for(const forbidden of [
   "/v1/selftest/modelscope-studio-lite-prepare-once","/v1/selftest/modelscope-studio-lite-deploy-once","/v1/selftest/modelscope-studio-lite-stop-once","/v1/selftest/modelscope-studio-lite-bootstrap-once",
   "studio-lite-once-v1-20260817","studio-lite-once-v2-20260817","/_diag/mslite-v3-R4m8Xq2Z","/_diag/mslite-workflow-v3-start-Q7t2","/_diag/mslite-workflow-v3-status-Q7t2",
-  "/_diag/mslite-runlog-K9p4","/_diag/mslite-v4-start-T8p2","/_diag/mslite-v4-status-T8p2"
+  "/_diag/mslite-runlog-K9p4","/_diag/mslite-v4-start-T8p2","/_diag/mslite-v4-status-T8p2","/_diag/mslite-task-sum-K4q7P9"
 ]) assert.ok(!entry.includes(forbidden)&&!productionEntry.includes(forbidden),`Public Studio Lite diagnostic/write surface must be absent: ${forbidden}`);
 
 assert.ok(!wrangler.includes('"schedules"'),"Permanent Studio Lite Workflow must not self-schedule");
@@ -53,4 +69,4 @@ assert.ok(!entry.includes('req.method===\"POST\"&&url.pathname===\"/v1/selftest/
 assert.ok(entry.indexOf('url.pathname===\"/v1/admin/modelscope/studio-lite/stop\"')>=0,"Internal emergency stop route must exist");
 assert.ok(!studio.includes("private:true"),"Obsolete ModelScope private:true settings field must not return");
 
-console.log(JSON.stringify({ok:true,suite:"modelscope-studio-lite-cpu-runner-contract",module_imported:true,target_hardware:"platform/2v-cpu-16g-mem",nominal_cpu:2,nominal_memory_gb:16,min_effective_cpu:1.9,min_effective_memory_gib:14,free_only:true,paid_fallback:false,private_studio:true,visibility_contract:"private",phased_runner:true,idempotent_upload:true,stop_independent_of_hardware_catalog:true,public_write_surface:false,public_diagnostic_surface:false,internal_workflow_control:true,demand_driven:true,production_accepted:true}));
+console.log(JSON.stringify({ok:true,suite:"modelscope-studio-lite-cpu-runner-contract",module_imported:true,target_hardware:"platform/2v-cpu-16g-mem",nominal_cpu:2,nominal_memory_gb:16,min_effective_cpu:1.9,min_effective_memory_gib:14,free_only:true,paid_fallback:false,private_studio:true,visibility_contract:"private",phased_runner:true,idempotent_upload:true,stop_independent_of_hardware_catalog:true,public_write_surface:false,public_diagnostic_surface:false,internal_workflow_control:true,demand_driven:true,production_accepted:true,business_e2e_attested:true,automatic_when_free_stock:true}));
