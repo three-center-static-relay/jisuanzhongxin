@@ -47,24 +47,24 @@ async function identity(env={}){
   const me=await req(`${OPENAPI}/users/me`,{headers:headers(t,false)}),owner=me.ok?username(payload(me)):null;
   return me.ok&&owner?{ok:true,configured:true,authenticated:true,token:t,owner}:{ok:false,configured:true,authenticated:me.status!==401&&me.status!==403,error_class:!me.ok?`MODELSCOPE_IDENTITY_HTTP_${me.status}`:"MODELSCOPE_OWNER_UNRESOLVED"};
 }
-function hasVariable(raw,key){for(const o of objects(raw)){const k=str(o?.key||o?.Key||o?.name||o?.Name);if(k===key)return true}return false}
-async function variableRequest(t,owner,method,body){return req(`${OPENAPI}/studios/${encodeURIComponent(owner)}/${encodeURIComponent(REPO_NAME)}/variables`,{method,headers:headers(t),body,timeout:15000})}
+function hasTaskSecret(raw,key){for(const o of objects(raw)){const k=str(o?.key||o?.Key||o?.name||o?.Name);if(k===key)return true}return false}
+async function secretRequest(t,owner,method,body){return req(`${OPENAPI}/studios/${encodeURIComponent(owner)}/${encodeURIComponent(REPO_NAME)}/secrets`,{method,headers:headers(t),body,timeout:15000})}
 
 export async function setModelScopeStudioLiteTask(env={},task){
   const normalized=normalizeModelScopeLiteTask(task,task?.task_id);if(!normalized.ok)return{ok:false,stage:"task-validate",error_class:normalized.error,free_only:true,paid_fallback:false,secrets_redacted:true};
   const id=await identity(env);if(!id.ok)return{ok:false,stage:"identity",error_class:id.error_class,free_only:true,paid_fallback:false,secrets_redacted:true};
-  const list=await variableRequest(id.token,id.owner,"GET",null);if(!list.ok)return{ok:false,stage:"variable-list",http_status:list.status,error_class:`MODELSCOPE_VARIABLE_LIST_HTTP_${list.status}`,free_only:true,paid_fallback:false,secrets_redacted:true};
-  const exists=hasVariable(list.data,TASK_VAR),value=JSON.stringify(normalized.task);
-  const write=await variableRequest(id.token,id.owner,exists?"PUT":"POST",{key:TASK_VAR,value});
-  return{ok:write.ok,stage:write.ok?"task-injected":"task-inject-failed",http_status:write.status,task_id:normalized.task.task_id,op:normalized.task.op,variable_action:exists?"update":"add",error_class:write.ok?null:`MODELSCOPE_TASK_VARIABLE_HTTP_${write.status}`,free_only:true,paid_fallback:false,secrets_redacted:true};
+  const list=await secretRequest(id.token,id.owner,"GET",null);if(!list.ok)return{ok:false,stage:"secret-list",http_status:list.status,error_class:`MODELSCOPE_SECRET_LIST_HTTP_${list.status}`,free_only:true,paid_fallback:false,secrets_redacted:true};
+  const exists=hasTaskSecret(list.data,TASK_VAR),value=JSON.stringify(normalized.task);
+  const write=await secretRequest(id.token,id.owner,exists?"PUT":"POST",{key:TASK_VAR,value});
+  return{ok:write.ok,stage:write.ok?"task-injected":"task-inject-failed",http_status:write.status,task_id:normalized.task.task_id,op:normalized.task.op,secret_action:exists?"update":"add",error_class:write.ok?null:`MODELSCOPE_TASK_SECRET_HTTP_${write.status}`,free_only:true,paid_fallback:false,secrets_redacted:true,task_value_exposed:false};
 }
 
 export async function clearModelScopeStudioLiteTask(env={}){
   const id=await identity(env);if(!id.ok)return{ok:false,stage:"identity",error_class:id.error_class,free_only:true,paid_fallback:false,secrets_redacted:true};
-  const list=await variableRequest(id.token,id.owner,"GET",null);if(!list.ok)return{ok:false,stage:"variable-list",http_status:list.status,error_class:`MODELSCOPE_VARIABLE_LIST_HTTP_${list.status}`,free_only:true,paid_fallback:false,secrets_redacted:true};
-  if(!hasVariable(list.data,TASK_VAR))return{ok:true,stage:"task-variable-absent",deleted:false,free_only:true,paid_fallback:false,secrets_redacted:true};
-  const del=await variableRequest(id.token,id.owner,"DELETE",{key:TASK_VAR});
-  return{ok:del.ok,stage:del.ok?"task-variable-cleared":"task-variable-clear-failed",deleted:del.ok,http_status:del.status,error_class:del.ok?null:`MODELSCOPE_TASK_VARIABLE_DELETE_HTTP_${del.status}`,free_only:true,paid_fallback:false,secrets_redacted:true};
+  const list=await secretRequest(id.token,id.owner,"GET",null);if(!list.ok)return{ok:false,stage:"secret-list",http_status:list.status,error_class:`MODELSCOPE_SECRET_LIST_HTTP_${list.status}`,free_only:true,paid_fallback:false,secrets_redacted:true};
+  if(!hasTaskSecret(list.data,TASK_VAR))return{ok:true,stage:"task-secret-absent",deleted:false,free_only:true,paid_fallback:false,secrets_redacted:true};
+  const del=await secretRequest(id.token,id.owner,"DELETE",{key:TASK_VAR});
+  return{ok:del.ok,stage:del.ok?"task-secret-cleared":"task-secret-clear-failed",deleted:del.ok,http_status:del.status,error_class:del.ok?null:`MODELSCOPE_TASK_SECRET_DELETE_HTTP_${del.status}`,free_only:true,paid_fallback:false,secrets_redacted:true};
 }
 
 function parseTaskReceipt(raw,taskId){for(const s of strings(raw)){for(const line of s.split(/\r?\n/)){const i=line.indexOf(TASK_MARKER);if(i<0)continue;try{const x=JSON.parse(line.slice(i+TASK_MARKER.length).trim());if(x?.revision===TASK_REVISION&&x?.task_id===taskId)return x}catch{}}}return null}
@@ -80,4 +80,4 @@ export async function getModelScopeStudioLiteTaskStatus(env={},taskId=""){
   return{ok:done&&receipt?.ok===true,completed:done,task_id:idValue,task_receipt:cleanReceipt(receipt),log_http_status:logs.status,error_class:done?(receipt?.ok===true?null:(receipt?.error_class||"MODELSCOPE_TASK_FAILED")):"MODELSCOPE_TASK_RECEIPT_PENDING",free_only:true,paid_fallback:false,secrets_redacted:true};
 }
 
-export const modelScopeStudioTaskMeta=()=>({provider:"modelscope-studio-lite",task_revision:TASK_REVISION,task_variable:TASK_VAR,allowed_ops:["sum","stats","dot","matmul","linear_regression","monte_carlo_pi"],max_task_bytes:MAX_TASK_BYTES,arbitrary_code:false,network_task_input:false,free_only:true,paid_fallback:false});
+export const modelScopeStudioTaskMeta=()=>({provider:"modelscope-studio-lite",task_revision:TASK_REVISION,task_secret:TASK_VAR,task_transport:"ephemeral-studio-secret",allowed_ops:["sum","stats","dot","matmul","linear_regression","monte_carlo_pi"],max_task_bytes:MAX_TASK_BYTES,arbitrary_code:false,network_task_input:false,task_value_exposed:false,free_only:true,paid_fallback:false});
