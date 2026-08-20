@@ -19,34 +19,31 @@ async function gateFetch(env,path,method="POST",body={}){
 }
 async function releaseGate(env,taskId){return gateFetch(env,"/release","POST",{task_id:taskId})}
 
+async function cleanupTask(instance,step,taskId){
+  let stopped=null,cleared=null,released=null;
+  stopped=await step.do("stop Studio Lite after task",STOP_RETRY,async()=>{
+    try{return await stopModelScopeStudioLite(instance.env)}catch(e){return{ok:false,error_class:`STOP_THROW_${String(e?.name||"ERROR")}`}}
+  });
+  cleared=await step.do("clear Studio Lite task variable",CLEANUP_ATTEMPT,async()=>{
+    try{return await clearModelScopeStudioLiteTask(instance.env)}catch(e){return{ok:false,error_class:`CLEAR_THROW_${String(e?.name||"ERROR")}`}}
+  });
+  released=await step.do("release ModelScope compute gate",CLEANUP_ATTEMPT,async()=>{
+    try{return await releaseGate(instance.env,taskId)}catch(e){return{ok:false,error:`RELEASE_THROW_${String(e?.name||"ERROR")}`}}
+  });
+  return{stopped,cleared,released,ok:stopped?.ok===true&&cleared?.ok===true&&released?.ok===true};
+}
+
 async function runTaskWorkflow(instance,event,step){
   const rawTask=event?.payload?.task,normalized=normalizeModelScopeLiteTask(rawTask,rawTask?.task_id);
   if(!normalized.ok)throw new Error(`task-validate:${normalized.error}`);
   const task=normalized.task,taskId=task.task_id;
-  let prepared=null,injected=null,deployed=null,taskStatus=null,stopped=null,cleared=null,failure=null;
+  let prepared=null,injected=null,deployed=null,taskStatus=null,failure=null;
   try{
     prepared=await step.do("prepare task-capable Studio Lite",ONE_ATTEMPT,async()=>{
-      const r=await prepareModelScopeStudioLite(instance.env);
-      if(r?.ok!==true)throw err("prepare",r);
-      if(r?.hardware?.name!==TARGET||r?.hardware?.resource_type!=="free")throw new Error("prepare:FREE_TARGET_MISMATCH");
-      return r;
+      const r=await prepareModelScopeStudioLite(instance.env);if(r?.ok!==true)throw err("prepare",r);if(r?.hardware?.name!==TARGET||r?.hardware?.resource_type!=="free")throw new Error("prepare:FREE_TARGET_MISMATCH");return r;
     });
-    injected=await step.do("inject bounded Studio Lite task",ONE_ATTEMPT,async()=>{
-      const r=await setModelScopeStudioLiteTask(instance.env,task);
-      if(r?.ok!==true)throw err("task-inject",r);
-      return r;
-    });
-    deployed=await step.do(
-      "deploy Studio Lite task",
-      ONE_ATTEMPT,
-      async()=>{
-        const r=await deployModelScopeStudioLite(instance.env);
-        if(r?.ok!==true)throw err("deploy",r);
-        if(r?.hardware?.name!==TARGET||r?.hardware?.resource_type!=="free")throw new Error("deploy:FREE_TARGET_MISMATCH");
-        return r;
-      },
-      {rollback:async()=>{await stopModelScopeStudioLite(instance.env)},rollbackConfig:STOP_RETRY}
-    );
+    injected=await step.do("inject bounded Studio Lite task",ONE_ATTEMPT,async()=>{const r=await setModelScopeStudioLiteTask(instance.env,task);if(r?.ok!==true)throw err("task-inject",r);return r});
+    deployed=await step.do("deploy Studio Lite task",ONE_ATTEMPT,async()=>{const r=await deployModelScopeStudioLite(instance.env);if(r?.ok!==true)throw err("deploy",r);if(r?.hardware?.name!==TARGET||r?.hardware?.resource_type!=="free")throw new Error("deploy:FREE_TARGET_MISMATCH");return r},{rollback:async()=>{await stopModelScopeStudioLite(instance.env)},rollbackConfig:STOP_RETRY});
     for(let i=0;i<8;i++){
       await step.sleep(`wait for Studio task ${i+1}`,"30 seconds");
       const status=await step.do(`inspect Studio task receipt ${i+1}`,STATUS_ATTEMPT,async()=>getModelScopeStudioLiteTaskStatus(instance.env,taskId));
@@ -56,50 +53,25 @@ async function runTaskWorkflow(instance,event,step){
     if(taskStatus.ok!==true)throw err("task-execute",taskStatus);
   }catch(e){failure=String(e?.message||e||"TASK_WORKFLOW_FAILED")}
 
-  stopped=await step.do("stop Studio Lite after task",STOP_RETRY,async()=>{
-    const r=await stopModelScopeStudioLite(instance.env);if(r?.ok!==true)throw err("stop",r);return r;
-  });
-  cleared=await step.do("clear Studio Lite task variable",CLEANUP_ATTEMPT,async()=>{
-    const r=await clearModelScopeStudioLiteTask(instance.env);if(r?.ok!==true)throw err("task-clear",r);return r;
-  });
-  const released=await step.do("release ModelScope compute gate",CLEANUP_ATTEMPT,async()=>{
-    const r=await releaseGate(instance.env,taskId);if(r?.ok!==true)throw err("gate-release",r);return r;
-  });
-
+  const cleanup=await cleanupTask(instance,step,taskId);
+  if(!cleanup.ok){const parts=[];if(cleanup.stopped?.ok!==true)parts.push("stop");if(cleanup.cleared?.ok!==true)parts.push("variable");if(cleanup.released?.ok!==true)parts.push("gate");const cleanupFailure=`cleanup:FAILED=${parts.join(",")}`;failure=failure?`${failure};${cleanupFailure}`:cleanupFailure}
   if(failure)throw new Error(failure);
-  if(!prepared||!injected||!deployed||!taskStatus||!stopped||!cleared||!released)throw new Error("task-workflow:INCOMPLETE_STATE");
+  if(!prepared||!injected||!deployed||!taskStatus)throw new Error("task-workflow:INCOMPLETE_STATE");
   return{
-    ok:true,
-    stage:"task-completed",
-    runner:"modelscope-studio-lite-workflow",
-    workflow_instance_id:event.instanceId,
-    task_id:taskId,
-    op:task.op,
-    task_receipt:taskStatus.task_receipt,
-    target_hardware:TARGET,
-    resource_type:"free",
-    stopped:{http_status:stopped.stop_http_status||null},
-    task_variable_cleared:cleared.ok===true,
-    gate_released:released.ok===true,
-    polling_rounds_max:8,
-    polling_sleep_seconds:30,
-    arbitrary_code:false,
-    free_only:true,
-    paid_fallback:false,
-    secrets_redacted:true
+    ok:true,stage:"task-completed",runner:"modelscope-studio-lite-workflow",workflow_instance_id:event.instanceId,task_id:taskId,op:task.op,task_receipt:taskStatus.task_receipt,target_hardware:TARGET,resource_type:"free",
+    stopped:{http_status:cleanup.stopped?.stop_http_status||null},task_variable_cleared:cleanup.cleared?.ok===true,gate_released:cleanup.released?.ok===true,
+    polling_rounds_max:8,polling_sleep_seconds:30,arbitrary_code:false,free_only:true,paid_fallback:false,secrets_redacted:true
   };
 }
 
 export class ModelScopeStudioLiteWorkflow extends WorkflowEntrypoint{
   async run(event,step){
     if(event?.payload?.mode==="task")return runTaskWorkflow(this,event,step);
-
     const prior=await step.do("check prior verified Studio receipt",STATUS_ATTEMPT,async()=>getModelScopeStudioLiteStatus(this.env));
     if(verifiedV3(prior)){
       const stopped=await step.do("ensure previously verified Studio is stopped",STOP_RETRY,async()=>{const s=await stopModelScopeStudioLite(this.env);if(s?.ok!==true)throw err("stop-prior",s);return s});
       return{ok:true,stage:"already-verified",runner:"modelscope-studio-lite-workflow",workflow_instance_id:event.instanceId,target_hardware:TARGET,resource_type:"free",runtime_receipt:prior.runtime_receipt,stopped:{http_status:stopped.stop_http_status||null},subrequest_budget_max:50,polling_rounds_max:8,polling_sleep_seconds:30,free_only:true,paid_fallback:false,secrets_redacted:true};
     }
-
     let prepared=null,deployed=null,verified=null,failure=null,stopped=null;
     try{
       prepared=await step.do("prepare Studio Lite",ONE_ATTEMPT,async()=>{const r=await prepareModelScopeStudioLite(this.env);if(r?.ok!==true)throw err("prepare",r);if(r?.hardware?.name!==TARGET||r?.hardware?.resource_type!=="free")throw new Error("prepare:FREE_TARGET_MISMATCH");return r});
