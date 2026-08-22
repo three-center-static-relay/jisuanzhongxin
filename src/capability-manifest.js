@@ -20,12 +20,20 @@ export function computeCapabilityManifest({backends={}}={}){
     capability({id:"compute.geospatial-analysis",type:"composite",domain:"geospatial",operations:["geospatial.analyze","earth-observation.compute","datacube.process"],health:earthReady||openEOReady?"ready":"unavailable",compatible_with:["intelligence.geospatial-evidence"],substitutes:earthReady&&openEOReady?["compute.geospatial-analysis.google-ee","compute.geospatial-analysis.openeo"]:[],reliability:0.8,accuracy:0.86},observedAt),
     capability({id:"compute.simulation",type:"composite",domain:"simulation",operations:["monte-carlo.run","scenario.simulate","causal.compute"],health:kaggleReady?"ready":"unavailable",dependencies:["compute.cpu"],reliability:0.84,accuracy:0.88},observedAt),
     capability({id:"compute.optimization",type:"composite",domain:"optimization",operations:["optimization.solve","portfolio.optimize","route.optimize"],health:kaggleReady?"ready":"unavailable",dependencies:["compute.cpu"],reliability:0.84,accuracy:0.9},observedAt),
-    capability({id:"compute.symbolic-knowledge",domain:"knowledge",operations:["symbolic.query","formula.solve","computational.knowledge"],health:wolframReady?"ready":"unavailable",network_scope:"wolfram-only",reliability:0.75,accuracy:0.84},observedAt)
+    capability({id:"compute.symbolic-knowledge",domain:"knowledge",operations:["symbolic.query","formula.solve","computational.knowledge"],health:wolframReady?"ready":"unavailable",network_scope:"wolfram-only",reliability:0.75,accuracy:0.84},observedAt),
+    capability({id:"compute.forecast-calibration",type:"composite",domain:"decision-science",operations:["forecast.score.brier","forecast.score.log-loss","forecast.calibration","forecast.aggregate"],health:"ready",network_scope:"none",reliability:0.95,accuracy:0.95},observedAt),
+    capability({id:"compute.signal-detection",type:"composite",domain:"decision-science",operations:["warning.hit-rate","warning.false-alarm-rate","warning.miss-rate","signal.d-prime","signal.criterion"],health:"ready",network_scope:"none",reliability:0.95,accuracy:0.95},observedAt),
+    capability({id:"compute.robust-decision-analysis",type:"composite",domain:"decision-science",operations:["scenario.regret","strategy.robustness","worst-case.evaluate","failure-rate.evaluate"],health:"ready",network_scope:"none",compatible_with:["expert.reasoning","intelligence.warning-and-retask"],reliability:0.94,accuracy:0.94},observedAt),
+    capability({id:"compute.assumption-stress",type:"composite",domain:"decision-science",operations:["assumption.fragility","assumption.rank","hedge.priority","signpost.monitor"],health:"ready",network_scope:"none",compatible_with:["expert.reasoning"],reliability:0.94,accuracy:0.94},observedAt)
   ];
   return{abi_version:CAPABILITY_ABI_VERSION,center:"compute",generated_at:observedAt,capabilities,ecology:[
     {from:"compute.gpu",relation:"REQUIRES",to:"compute.cpu"},
     {from:"compute.simulation",relation:"REQUIRES",to:"compute.cpu"},
     {from:"compute.optimization",relation:"REQUIRES",to:"compute.cpu"},
-    {from:"compute.geospatial-analysis",relation:"COMPLEMENTS",to:"intelligence.geospatial-evidence"}
+    {from:"compute.geospatial-analysis",relation:"COMPLEMENTS",to:"intelligence.geospatial-evidence"},
+    {from:"compute.forecast-calibration",relation:"VALIDATES",to:"expert.forecasting"},
+    {from:"compute.signal-detection",relation:"VALIDATES",to:"intelligence.warning-and-retask"},
+    {from:"compute.robust-decision-analysis",relation:"COMPLEMENTS",to:"expert.reasoning"},
+    {from:"compute.assumption-stress",relation:"COMPLEMENTS",to:"expert.reasoning"}
   ]};
 }
